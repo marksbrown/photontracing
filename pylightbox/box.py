@@ -11,6 +11,7 @@ in geometries defined below. Several examples are given in this file.
 
 from __future__ import print_function, division
 from numpy import arcsin, sin, dot, subtract, linalg, cos, array, cumsum, isnan
+from numpy import tan, max, zeros, shape
 from itertools import combinations
 from const import *
 
@@ -71,14 +72,26 @@ class Box():  # Box Properties
     def Ref(self, face):
         return self.reflectivity[face]
 
-    def Fresnel(self, ph):
+    def OuterIndex(self, face):
+        return self.couplingindices[face]
+
+    def Fresnel(self, faces, i):
         '''
-        Returns Fresnel transmission amplitude for each face
+        Returns Fresnel reflectance for each face
+
+        face : face indices
+        i : incident angle
+        
         '''
         n1 = self.n
-        n2 = array([self.couplingindices[f] for f in ph["facet"]])
 
-        i = ph["angle"]
+        #n2 = array([self.couplingindices[f] for f in face])
+
+        n2 = zeros(shape(faces))
+        for uniqueface in set(faces):
+            n2[faces==uniqueface] = self.OuterIndex(uniqueface)
+
+        
         r = arcsin(n1 / n2 * sin(i))
 
         r[isnan(r)] = pi / 2
@@ -120,20 +133,26 @@ class Box():  # Box Properties
                 for L, p in Pairs[:N]:
                     q = [subtract(val, offset) for val in p]
                     x, y, z = zip(*q)
-                    axis.plot(x, y, z, 'k-', lw=2)
+                    axis.plot(x, y, z, 'k-', lw=2, alpha=0.2)
 
-        axis.set_xlabel("x (mm)")
-        axis.set_ylabel("y (mm)")
-        try:
-            axis.set_zlabel("z (mm)")
-        except AttributeError:
-            print("don't forget ax = fig.add_subplot(111,projection='3d')")
-            return
+        
+        axis.set_title(self) #overly complicated nonsense you pillock
+        tocube(axis)
+    
+def tocube(axis, defaultunit=mm):
+    
+    #axis.set_xlim(0,anum)
+    #axis.set_ylim(0,anum)
+    #axis.set_zlim(0,anum)
 
-        axis.set_title(self)
-        # axis.set_xticklabels(axis.get_xticks()/mm)
-        # axis.set_yticklabels(axis.get_yticks()/mm)
-        # axis.set_zticklabels(axis.get_zticks()/mm)
+    axis.set_xticklabels(axis.get_xticks()/defaultunit)
+    axis.set_yticklabels(axis.get_yticks()/defaultunit)
+    axis.set_zticklabels(axis.get_zticks()/defaultunit)
+    
+    axis.set_xlabel("x (mm)")
+    axis.set_ylabel("y (mm)")
+    axis.set_zlabel("z (mm)")
+    
 
 
 def TwoFacesBox(L, rindex=2, couplingindices={0: 1, 1: 1}, ref={0: 0, 1: 0},
