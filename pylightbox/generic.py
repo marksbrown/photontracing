@@ -1,7 +1,8 @@
 from __future__ import print_function, division
 import os
 
-def savefigure(name, loc, fig, Ext=['pdf', 'eps', 'png']): 
+
+def savefigure(name, loc, fig, Ext=['pdf', 'eps', 'png']):
     '''
     Saves figure to location given by rootloc/<ext>/<name>.<ext>
     '''
@@ -18,13 +19,14 @@ def savefigure(name, loc, fig, Ext=['pdf', 'eps', 'png']):
         saveloc = os.path.join(loc, ext, aname)
         fig.savefig(saveloc)
 
+
 def tocube(ax, anum=1):
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.set_zlabel("z")
-    ax.set_xlim(-1,1)
-    ax.set_ylim(-1,1)
-    ax.set_zlim(-1,1)
+    ax.set_xlim(-1, 1)
+    ax.set_ylim(-1, 1)
+    ax.set_zlim(-1, 1)
 
 
 def SaveData(df, name, key, loc):

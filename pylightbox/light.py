@@ -15,16 +15,18 @@ from numpy import shape, cumsum, arctan2, dstack, newaxis, tile, hstack, mean
 import os
 from scipy import stats
 from pandas import DataFrame, read_csv
-from const import *
+from .const import *
 
 
-##tmp
+# tmp
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.pyplot import subplots, show
-import box as Box
+from . import box as Box
 
-def lazydot(u, v): 
+
+def lazydot(u, v):
     return (u[0] * v[0]) + (u[1] * v[1]) + (u[2] * v[2])
+
 
 def _RotateVector(v, phi=0, theta=0, psi=0, verbose=0):
     '''
@@ -50,17 +52,18 @@ def _RotateVector(v, phi=0, theta=0, psi=0, verbose=0):
         print("matrix to rotate is", v)
     return dot(v, R)
 
+
 def RotateVectors(vectors, surfacenormal=[0, 0, 1], verbose=0):
     '''
     Rotate vectors
-    '''    
+    '''
     theta = lambda adir: arccos(adir[..., 2])
     phi = lambda adir: arctan2(adir[..., 1], adir[..., 0])
-    
-    return  _RotateVector(vectors,
-            phi(surfacenormal),
-            theta(surfacenormal),
-            verbose=verbose)
+
+    return _RotateVector(vectors,
+                         phi(surfacenormal),
+                         theta(surfacenormal),
+                         verbose=verbose)
 
 
 def _SampledDirection(N, loc, scale, dist, surfacenormal, verbose=0):
@@ -76,9 +79,10 @@ def _SampledDirection(N, loc, scale, dist, surfacenormal, verbose=0):
     Y = sin(Theta) * sin(Phi)
     Z = cos(Theta)
 
-    newvectors = dstack((X,Y,Z))[0,...]
-    
+    newvectors = dstack((X, Y, Z))[0, ...]
+
     return RotateVectors(newvectors, surfacenormal, verbose)
+
 
 def _RandomPointsOnASphere(N, hemisphere=False, split=False):
     '''
@@ -103,8 +107,9 @@ def _RandomPointsOnASphere(N, hemisphere=False, split=False):
         z = abs(1 - 2 * (x1 ** 2 + x2 ** 2))
     else:
         z = 1 - 2 * (x1 ** 2 + x2 ** 2)
-    
-    return dstack((x,y,z))[0,...]
+
+    return dstack((x, y, z))[0, ...]
+
 
 def LobeReflection(N=1, surfacenormal=[0, 0, 1], stddev=1.3 * Degrees, verbose=0):
     '''
@@ -112,37 +117,38 @@ def LobeReflection(N=1, surfacenormal=[0, 0, 1], stddev=1.3 * Degrees, verbose=0
     (corresponding to a polished surface - Moses2010)
     '''
     return _SampledDirection(N, loc=0, scale=stddev, dist=stats.norm,
-                            surfacenormal=surfacenormal, verbose=verbose)
+                             surfacenormal=surfacenormal, verbose=verbose)
+
 
 def LambertianReflection(N=1, surfacenormal=[0, 0, 1], verbose=0):
     '''
     Gives Lambertian distribution
     '''
     return _SampledDirection(N, loc=0, scale=0.5, dist=stats.cosine,
-                            surfacenormal=surfacenormal, verbose=verbose)
+                             surfacenormal=surfacenormal, verbose=verbose)
+
 
 def IsotropicReflection(N=1, surfacenormal=[0, 0, 1], verbose=0):
     '''
     no preferred direction hemispherical emission
     '''
-    newvectors = _RandomPointsOnASphere(N, hemisphere=True) 
-    
+    newvectors = _RandomPointsOnASphere(N, hemisphere=True)
+
     if verbose > 0:
-        print("shape is",shape(newvectors))
+        print("shape is", shape(newvectors))
     if verbose > 1:
         for avec in newvectors:
             print(avec)
 
     return RotateVectors(newvectors, surfacenormal, verbose)
-   
-#### end of reflection stuff
+
 
 def IsotropicSource(N, Pos=[0, 0, 0]):
     '''
     Returns a list of initial photons of size N
     direction, position, times
     '''
-    return _RandomPointsOnASphere(N), array(list([Pos])*N), zeros(N)
+    return _RandomPointsOnASphere(N), array(list([Pos]) * N), zeros(N)
 
 
 def NearestFace(Directions, Positions, aBox, verbose=0, threshold=1e-15):
@@ -167,17 +173,18 @@ def NearestFace(Directions, Positions, aBox, verbose=0, threshold=1e-15):
         Faces = where(Conditions, i, Faces)
         nds = where(Conditions, ndots, nds)
         DistanceTo = where(Conditions, DistanceToFace, DistanceTo)
-    
-    
+
     if verbose > 1:
         print("--Nearest Face--")
         print("face index : distanceto")
-        for f, dst in zip(Faces,DistanceTo):
-            print(f,":",dst/mm)
+        for f, dst in zip(Faces, DistanceTo):
+            print(f, ":", dst / mm)
 
     return Faces, DistanceTo, nds
-    
-def EscapeStatus(faces, ndots, aBox, reflectivity=True, fresnel=True,verbose=0):
+
+
+def EscapeStatus(faces, ndots, aBox,
+                 reflectivity=True, fresnel=True, verbose=0):
     '''
     Photons arriving at a surface will change status to 'trapped','escaped'
     or 'absorbed' based on order of events
@@ -185,63 +192,57 @@ def EscapeStatus(faces, ndots, aBox, reflectivity=True, fresnel=True,verbose=0):
     2nd test : fresnel reflection
     3rd test : reflectivity parameter - this WILL override everything else
     '''
-    
-    ##photonstatus = array(["Trapped"] * len(faces))  # default status
-    ##CritAngles = [aBox.Crit(fc) for fc in faces]
-    
+
     CritAngles = zeros(shape(faces))
     for uniqueface in set(faces):
-        CritAngles[faces==uniqueface] = aBox.Crit(uniqueface)
-    
+        CritAngles[faces == uniqueface] = aBox.Crit(uniqueface)
 
     angles = array([arccos(aval) for aval in ndots])
     escapestatus = angles < CritAngles
-    
+
     if verbose > 1:
         print("--Critical--")
         print("incident angle : Escaped?")
-        for ang, esc in zip(angles,escapestatus):
-            print(ang/Degrees,":",esc)
-        print("Escaping",sum(escapestatus==True))
-        
+        for ang, esc in zip(angles, escapestatus):
+            print(ang / Degrees, ":", esc)
+        print("Escaping", sum(escapestatus == True))
+
     if fresnel:
         Fresnel = aBox.Fresnel(faces, angles)
         ru = random.uniform(size=len(faces))
         escapestatus = (array(Fresnel) < ru) & escapestatus
-        
+
         if verbose > 1:
             print("--Fresnel--")
             print("Reflectance : Escaped?")
-            for fr, esc in zip(Fresnel,escapestatus):
-                print(fr,":",esc)
-            print("Escaping",sum(escapestatus==True))
+            for fr, esc in zip(Fresnel, escapestatus):
+                print(fr, ":", esc)
+            print("Escaping", sum(escapestatus == True))
 
     if reflectivity:
-        # gets reflectivity of each photon
-        #Reflectivities = [aBox.Ref(fc) for fc in faces]
-
         Reflectivities = zeros(shape(faces))
         for uniqueface in set(faces):
-            Reflectivities[faces==uniqueface] = aBox.Ref(uniqueface)
+            Reflectivities[faces == uniqueface] = aBox.Ref(uniqueface)
 
         ru = random.uniform(size=len(faces))
         escapestatus = (array(Reflectivities) < ru) & escapestatus
-        
+
         if verbose > 1:
             print("--Reflectivity--")
             print("Reflectivity : Escaped?")
-            for rf, esc in zip(Reflectivities,escapestatus):
-                print(rf,":",esc)
-            print("Escaping",sum(escapestatus==True))
+            for rf, esc in zip(Reflectivities, escapestatus):
+                print(rf, ":", esc)
+            print("Escaping", sum(escapestatus == True))
 
+    return escapestatus  # if true, photon escapes
 
-    #photonstatus[escapestatus] = "Escaped"
-    
-    return escapestatus #if true, photon escapes
 
 def UpdateDirection(olddirection, faces, ndots, aBox, verbose=0):
+    '''
+    Updates direction (and time!) of photons
+    '''
     surfacenormals = array([aBox.normals[int(j)] for j in faces])
-          
+
     newdirection = olddirection - 2 * ndots[:, newaxis] * surfacenormals
 
     if verbose > 1:
@@ -249,36 +250,37 @@ def UpdateDirection(olddirection, faces, ndots, aBox, verbose=0):
         for od, nd in zip(olddirection, newdirection):
             print("Old direction :", od)
             print("New direction : ", nd)
-    
+
     return newdirection
 
-def UpdatePosition(oldposition, distanceto, oldtime, directions, aBox, verbose=0):                    
+
+def UpdatePosition(oldposition, distanceto, oldtime, directions, aBox, verbose=0):
+                   
     '''
     Moves photons to new position
     '''
-        
-    newposition = oldposition + distanceto[:, newaxis]*directions
-    newtime = oldtime + aBox.n * distanceto/SpeedOfLight
+
+    newposition = oldposition + distanceto[:, newaxis] * directions
+    newtime = oldtime + aBox.n * distanceto / SpeedOfLight
 
     if verbose > 1:
         print("--Update Position--")
-        for np, nt in zip(newposition,newtime):
-            print("New position : ", array(np)/mm)
-            print("Updated time : ", nt/ps,"ps")
+        for np, nt in zip(newposition, newtime):
+            print("New position : ", array(np) / mm)
+            print("Updated time : ", nt / ps, "ps")
 
     return newposition, newtime
 
-  
+
 def ToDataFrame(directions, positions, times, faces):
-        
+
     adict = [{"xpos": float(xpos), "ypos": float(ypos), "zpos": float(zpos),
              "xdir": float(xdir), "ydir": float(ydir), "zdir": float(zdir),
-             "face":fc, "time":atime}
+              "face": fc, "time": atime}
              for (xpos, ypos, zpos), (xdir, ydir, zdir), fc, atime in
              zip(positions, directions, faces, times)]
 
     return DataFrame(adict)
-    
 
 
 def IsotropicSource(N, Pos=[0, 0, 0]):
@@ -286,7 +288,7 @@ def IsotropicSource(N, Pos=[0, 0, 0]):
     Returns a list of initial photons of size N
     direction, position, times
     '''
-    return _RandomPointsOnASphere(N), array(list([Pos])*N), zeros(N)
+    return _RandomPointsOnASphere(N), array(list([Pos]) * N), zeros(N)
 
 
 def SpecularReflection(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
@@ -296,56 +298,50 @@ def SpecularReflection(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
 
     reflectivity = kwargs.get('reflectivity', True)
     fresnel = kwargs.get('fresnel', True)
-    
+
     ProcessedPhotons = []
 
     for runnum in range(runs):
         if runnum == 0:
             directions = idir
             positions = ipos
-            times = itime 
-
+            times = itime
 
         faces, distanceto, ndots = NearestFace(directions, positions,
-                                      aBox, verbose=verbose)
-    
-        positions, times = UpdatePosition(positions, distanceto, times, 
-                                        directions, aBox, verbose=verbose)
-                
-        directions = UpdateDirection(directions, faces, ndots, 
-                                        aBox, verbose=verbose)
-              
-        est = EscapeStatus(faces, ndots, aBox, fresnel = fresnel, 
-                reflectivity = reflectivity, verbose=verbose)
-        
-        if verbose>0:   
-            print("--Photons Escaped--")     
-            print(runnum,":","Escaped",sum(est), "Trapped",len(est)-sum(est))
+                                               aBox, verbose=verbose)
 
-        #fig, ax = subplots(figsize=(6,6),subplot_kw={'projection':'3d'})
-        #x,y,z = zip(*positions)
-        #ax.scatter(array(x),array(y),array(z))
-        #aBox.PlotFrame(ax)
-        
-        #show()                        
+        positions, times = UpdatePosition(positions, distanceto, times,
+                                          directions, aBox, verbose=verbose)
 
-        ProcessedPhotons += [{"xpos": float(xpos), "ypos": float(ypos), "zpos": float(zpos),
+        directions = UpdateDirection(directions, faces, ndots,
+                                     aBox, verbose=verbose)
+
+        est = EscapeStatus(faces, ndots, aBox, fresnel=fresnel,
+                           reflectivity=reflectivity, verbose=verbose)
+
+        if verbose > 0:
+            print("--Photons Escaped--")
+            print(runnum, ": Escaped", sum(est))
+
+        ProcessedPhotons += [
+            {"xpos": float(xpos), "ypos": float(ypos), "zpos": float(zpos),
              "xdir": float(xdir), "ydir": float(ydir), "zdir": float(zdir),
-             "face":fc, "time":atime,"ndots":nds, "photonstatus":"Escaped"}
-             for (xpos, ypos, zpos), (xdir, ydir, zdir), fc, atime, nds in
-             zip(positions[est], directions[est], faces[est], times[est], ndots[est])]
+             "face": fc, "time": atime, "ndots": nds, "photonstatus": "Escaped"}
+            for (xpos, ypos, zpos), (xdir, ydir, zdir), fc, atime, nds in
+            zip(positions[est], directions[est], faces[est], times[est], ndots[est])]
+                                  
 
-        
-        directions = directions[est==False]
-        positions = positions[est==False]
-        times = times[est==False]
-        
-    ##adds on all remaining 'trapped' photons
-    ProcessedPhotons += [{"xpos": float(xpos), "ypos": float(ypos), "zpos": float(zpos),
-             "xdir": float(xdir), "ydir": float(ydir), "zdir": float(zdir),
-             "face":fc, "time":atime,"ndots":nds, "photonstatus":"Trapped"}
-             for (xpos, ypos, zpos), (xdir, ydir, zdir), fc, atime, nds in
-             zip(positions, directions, faces, times, ndots)]
-        
-    return ProcessedPhotons    
+        directions = directions[est == False]
+        positions = positions[est == False]
+        times = times[est == False]
 
+    # adds on all remaining 'trapped' photons
+    ProcessedPhotons += [
+        {"xpos": float(xpos), "ypos": float(ypos), "zpos": float(zpos),
+         "xdir": float(xdir), "ydir": float(ydir), "zdir": float(zdir),
+         "face": fc, "time": atime, "ndots": nds, "photonstatus": "Trapped"}
+        for (xpos, ypos, zpos), (xdir, ydir, zdir), fc, atime, nds in
+        zip(positions, directions, faces, times, ndots)]
+                              
+
+    return ProcessedPhotons

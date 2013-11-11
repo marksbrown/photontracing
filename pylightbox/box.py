@@ -13,7 +13,7 @@ from __future__ import print_function, division
 from numpy import arcsin, sin, dot, subtract, linalg, cos, array, cumsum, isnan
 from numpy import tan, max, zeros, shape
 from itertools import combinations
-from const import *
+from .const import *
 
 
 class Box():  # Box Properties
@@ -81,17 +81,13 @@ class Box():  # Box Properties
 
         face : face indices
         i : incident angle
-        
+
         '''
         n1 = self.n
-
-        #n2 = array([self.couplingindices[f] for f in face])
-
         n2 = zeros(shape(faces))
         for uniqueface in set(faces):
-            n2[faces==uniqueface] = self.OuterIndex(uniqueface)
+            n2[faces == uniqueface] = self.OuterIndex(uniqueface)
 
-        
         r = arcsin(n1 / n2 * sin(i))
 
         r[isnan(r)] = pi / 2
@@ -113,7 +109,6 @@ class Box():  # Box Properties
 
         # Potential set of facets defining facet
         for X in combinations(self.corners, 4):
-            #x1,x2,x3,x4 = X
             if verbose > 0:
                 print(X)
             Lines = [subtract(a, b) for a, b in combinations(X, 2)]
@@ -135,24 +130,23 @@ class Box():  # Box Properties
                     x, y, z = zip(*q)
                     axis.plot(x, y, z, 'k-', lw=2, alpha=0.2)
 
-        
-        axis.set_title(self) #overly complicated nonsense you pillock
+        axis.set_title(self)  # overly complicated nonsense you pillock
         tocube(axis)
-    
-def tocube(axis, defaultunit=mm):
-    
-    #axis.set_xlim(0,anum)
-    #axis.set_ylim(0,anum)
-    #axis.set_zlim(0,anum)
 
-    axis.set_xticklabels(axis.get_xticks()/defaultunit)
-    axis.set_yticklabels(axis.get_yticks()/defaultunit)
-    axis.set_zticklabels(axis.get_zticks()/defaultunit)
-    
+
+def tocube(axis, defaultunit=mm):
+
+    # axis.set_xlim(0,anum)
+    # axis.set_ylim(0,anum)
+    # axis.set_zlim(0,anum)
+
+    axis.set_xticklabels(axis.get_xticks() / defaultunit)
+    axis.set_yticklabels(axis.get_yticks() / defaultunit)
+    axis.set_zticklabels(axis.get_zticks() / defaultunit)
+
     axis.set_xlabel("x (mm)")
     axis.set_ylabel("y (mm)")
     axis.set_zlabel("z (mm)")
-    
 
 
 def TwoFacesBox(L, rindex=2, couplingindices={0: 1, 1: 1}, ref={0: 0, 1: 0},
