@@ -6,13 +6,11 @@ def savefigure(name, loc, fig, Ext=['pdf', 'eps', 'png']):
     '''
     Saves figure to location given by rootloc/<ext>/<name>.<ext>
     '''
-    if not os.path.exists(loc):
-        os.mkdir(loc)
 
     for ext in Ext:
         extloc = os.path.join(loc, ext)
         if not os.path.exists(extloc):
-            os.mkdir(extloc)
+            os.makedirs(extloc)
 
     for ext in Ext:
         aname = name + '.' + ext

@@ -111,6 +111,21 @@ def _RandomPointsOnASphere(N, hemisphere=False, split=False):
     return dstack((x, y, z))[0, ...]
 
 
+def SpecularReflection(olddirection, surfacenormal, ndots, verbose=0):
+    '''
+    Specular (mirror-like) Reflection
+    '''    
+    newdirection = olddirection - 2 * ndots[:, newaxis] * surfacenormal
+
+    if verbose > 1:
+        print("--Update Direction--")
+        for od, nd in zip(olddirection, newdirection):
+            print("Old direction :", od)
+            print("New direction : ", nd)
+
+    return newdirection
+
+
 def LobeReflection(N=1, surfacenormal=[0, 0, 1], stddev=1.3 * Degrees, verbose=0):
     '''
     Gives normal distribution with a standard deviation of 1.3 degrees
@@ -241,18 +256,87 @@ def UpdateDirection(olddirection, faces, ndots, aBox, verbose=0):
     '''
     Updates direction (and time!) of photons
     '''
-    surfacenormals = array([aBox.normals[int(j)] for j in faces])
 
-    newdirection = olddirection - 2 * ndots[:, newaxis] * surfacenormals
-
-    if verbose > 1:
-        print("--Update Direction--")
-        for od, nd in zip(olddirection, newdirection):
-            print("Old direction :", od)
-            print("New direction : ", nd)
+    newdirection = zeros(shape(olddirection))
+    
+    for uniqueface in set(faces):
+        if not any(faces == uniqueface):
+            continue
+        else:
+            pass
+            #print(uniqueface," has ", sum(faces == uniqueface), " photons incident")
+        surfacenormal = aBox.normals[uniqueface]
+        od = olddirection[faces == uniqueface,...]
+        nds = ndots[faces == uniqueface]
+        newdirection[faces == uniqueface,...] = SpecularReflection(od, surfacenormal, nds, verbose=verbose)
 
     return newdirection
 
+#def UpdateDirection(olddirection, faces, ndots, aBox, verbose=0):
+#    '''
+#    Updates direction (and time!) of photons
+#    '''
+#    
+#    surfacenormals = array([aBox.normals[int(j)] for j in faces])
+#           
+#    return SpecularReflection(olddirection, surfacenormals, ndots, verbose=verbose)    
+
+
+
+def UpdateUnifiedDirection(olddirection, faces, ndots, aBox, verbose=0):
+    '''
+    Calculates new direction for a given photon at a given face for a set
+    of UNIFIED parameters
+    '''
+    
+    surfacenormals = array([aBox.normals[int(j)] for j in faces])
+
+    unifiedparameters = zeros(shape(faces))
+    for uniqueface in set(faces):
+        unifiedparameters[faces == uniqueface] = aBox.GetUnified(uniqueface)
+        
+    def firsttrue(param):
+        unifiednames = ['specular','lobe','backscatter','lambertian']
+        for j,p in enumerate(param):
+            if p:
+                return unifiednames[j]
+
+    whichreflection = [firsttrue(ru < up) for (ru,up) 
+                in zip(random.uniform(size=len(faces)), unifiedparameters)]
+    
+    def getnewdirection(key, olddirection, ndots, surfacenormal):
+        if key == "specular":
+            return SpecularReflection(olddirection, surfacenormal, ndots, verbose=verbose)    
+        elif key == 'lobe':
+            return LobeReflection(len(ndots), surfacenormal)
+        elif key == 'backscatter':
+            return -1*olddirection
+        elif key == 'lambertian':
+            return LambertianReflection(len(ndots),surfacenormal)
+        else:
+            print("Unknown Reflection type!")
+            return 
+    
+    #TODO get this all bloody working
+    #Here's how I see it working : we pass by surface normal grouped such that we
+    #Can general large N of new directions rotated easily. This does have a cost
+    #when it comes to specular but we can worry about that later. For now, this needs
+    #To be set up correctly such that we only pass the information needs to the above
+    #function and everything else is kept out of the way. We also need to (SOMEHOW!)
+    #collect the _newdirections_ in a sane manner please - right now it will not work!
+
+    ##good luck :)
+    newdirections = tile(shape(faces)) 
+    for uniqueface in set(faces):
+        for aref in set(whichreflection): #faces x numunified (6 x 4 groups for a cube!)
+            newdirections[faces == uniqueface] = getnewdirection(aref, 
+                         olddirection[faces == uniqueface],
+                         ndots[faces == uniqueface],
+                         array(aBox.normals[uniqueface]))
+        
+        
+    l = [newdirection(key,grp) for key,grp in ph.groupby('whichreflection')]
+    return [item for sublist in l for item in sublist]
 
 def UpdatePosition(oldposition, distanceto, oldtime, directions, aBox, verbose=0):
                    
@@ -291,9 +375,9 @@ def IsotropicSource(N, Pos=[0, 0, 0]):
     return _RandomPointsOnASphere(N), array(list([Pos]) * N), zeros(N)
 
 
-def SpecularReflection(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
+def LightinaBox(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
     '''
-    Specular reflection in aBox
+    Meh
     '''
 
     reflectivity = kwargs.get('reflectivity', True)

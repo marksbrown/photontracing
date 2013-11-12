@@ -75,6 +75,9 @@ class Box():  # Box Properties
     def OuterIndex(self, face):
         return self.couplingindices[face]
 
+    def SurfaceNormal(self, face):
+        return self.normals[face]
+
     def Fresnel(self, faces, i):
         '''
         Returns Fresnel reflectance for each face
