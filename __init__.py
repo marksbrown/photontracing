@@ -1,1 +1,1 @@
-from pylightbox import *
+from .pylightbox import *

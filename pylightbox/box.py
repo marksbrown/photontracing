@@ -11,7 +11,7 @@ in geometries defined below. Several examples are given in this file.
 
 from __future__ import print_function, division
 from numpy import arcsin, sin, dot, subtract, linalg, cos, array, cumsum, isnan
-from numpy import tan, max, zeros, shape
+from numpy import tan, zeros, shape
 from itertools import combinations
 from .const import *
 
