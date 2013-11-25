@@ -1,6 +1,7 @@
 from __future__ import print_function, division
 import os
 from .const import *
+from numpy import ptp
 
 
 def savefigure(name, loc, fig, Ext=['pdf', 'eps', 'png']):
@@ -31,3 +32,29 @@ def labelaxes(axis, defaultunit=mm):
     axis.set_xlabel("x (mm)")
     axis.set_ylabel("y (mm)")
     axis.set_zlabel("z (mm)")
+
+
+def PlotTime(axis, df, verbose=0, **kwargs):
+
+    timerange = kwargs.pop('timerange',(0, 1000))
+    dt = kwargs.pop('dt',1)
+    Bins = ptp(timerange)/dt
+
+    if verbose > 0:    
+        print("Energy in plot is :",sum(df.energy)*1e2,"%")
+
+    axis.hist(df.time/ps,range=timerange,bins=Bins, weights=df.energy,**kwargs)
+    axis.grid(True)
+    axis.set_xlim(timerange)
+    axis.set_xlabel("time (ps)")
+    axis.set_ylabel("frequency")
+    
+
+def PlotAngle(axis, df, verbose=0, **kwargs):
+    
+    axis.hist(df.angle/Degrees,range=(0,90),bins=91, weights=df.energy,**kwargs)
+    axis.grid(True)
+    axis.set_xlabel("Angle (Degrees)")
+    axis.set_ylabel("frequency")
+
+    

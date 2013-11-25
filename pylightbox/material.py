@@ -18,9 +18,11 @@ class Surface():
         if kwargs.has_key('unified'):
             #UNIFIED Model : specular,lobe,backscatter,lambertian       
             self.surface = cumsum(kwargs.get('unified', [1,0,0,0,0])) 
+            assert len(self.surface)==5, "Incorrect number of parameters passed"
             self.lobeangle = kwargs.get('lobeangle', 0*Degrees)
         elif kwargs.has_key('extended'):
-            self.surface = cumsum(kwargs.get('extended', [1,0,0,0,0])) 
+            self.surface = cumsum(kwargs.get('extended', [1,0,0,0,0]))
+            assert len(self.surface)==5, "Incorrect number of parameters passed" 
             self.lobeangle = kwargs.get('lobeangle', 0*Degrees)
             self.mintheta = kwargs.get('mintheta', 0*Degrees)
             self.maxtheta = kwargs.get('maxtheta', 90*Degrees)
