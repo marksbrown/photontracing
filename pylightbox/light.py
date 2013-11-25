@@ -158,21 +158,20 @@ def IsotropicReflection(N=1, surfacenormal=array([0, 0, 1]), verbose=0):
     '''
     adirection = _RandomPointsOnASphere(N, hemisphere=True)
 
-    return RotateVectors(adirection, surfacenormal, verbose)
+    return RotateVectors(adirection, -surfacenormal, verbose)
 
 
-def IsotropicSegmentReflection(N=1, surfacenormal=array([0, 0, 1]),
-                               mintheta=0, maxtheta=90 * Degrees, fetchall=False, verbose=0):
+def IsotropicSegmentReflection(N=1, surfacenormal=array([0, 0, 1]), mat=None,
+                               fetchall=False, verbose=0):
     '''
-    Returns N directions from sphere point picking (Marsaglia 1972) which are inside
-    the _mintheta_ and _maxtheta_ allowed polar angles
+    Returns N directions from sphere point picking (Marsaglia 1972)
     '''
 
     while True:
         ListOfDirections = GenerateIsotropicList(N)
 
-        mincondition = ListOfDirections[..., 2] < cos(mintheta)
-        maxcondition = ListOfDirections[..., 2] > cos(maxtheta)
+        mincondition = ListOfDirections[..., 2] < cos(mat.mintheta)
+        maxcondition = ListOfDirections[..., 2] > cos(mat.maxtheta)
 
         try:  # matching directions aren't wasted when we generate more
             AllowedDirections = vstack((AllowedDirections,
@@ -360,7 +359,7 @@ def _firsttrue(param):
             return j
 
 
-def _getnewdirection(key, olddirection, ndots, surfacenormal, verbose=0):
+def _getnewdirection(key, olddirection, ndots, surfacenormal, mat, verbose=0):
     '''
     Returns newdirection based reflection model chosen by _key_
 
@@ -381,7 +380,7 @@ def _getnewdirection(key, olddirection, ndots, surfacenormal, verbose=0):
             ndots,
             verbose=verbose)
         return (
-            vstack([LobeReflection(1, nsd, verbose=verbose)
+            vstack([LobeReflection(1, nsd, stddev=mat.lobeangle, verbose=verbose)
                    for nsd in newspeculardirection])
         )
     elif key == 2:  # backscatter
@@ -389,7 +388,7 @@ def _getnewdirection(key, olddirection, ndots, surfacenormal, verbose=0):
     elif key == 3:  # lambertian
         return LambertianReflection(len(ndots), surfacenormal)
     elif key == 4:  # confined hemisphere
-        return IsotropicSegmentReflection(len(ndots), surfacenormal)
+        return IsotropicSegmentReflection(len(ndots), surfacenormal, mat)
     else:
         raise NotImplementedError("Unknown Reflection type!")
         return
@@ -401,7 +400,7 @@ def UpdateDirection(olddirection, faces, ndots, aBox, verbose=0):
     of UNIFIED parameters
     '''
 
-    unifiedparameters = zeros((len(faces), 4))
+    unifiedparameters = zeros((len(faces), 5))
 
     for uniqueface in set(faces):
         Condition = (faces == uniqueface)
@@ -410,12 +409,10 @@ def UpdateDirection(olddirection, faces, ndots, aBox, verbose=0):
     whichreflection = array([_firsttrue(ru < up) for (ru, up)
                              in zip(random.uniform(size=len(faces)), unifiedparameters)])
 
-    namedict = {0: 'Specular', 1: 'Lobe', 2: 'Backscatter', 3: 'Lambertian'}
+    namedict = {0: 'Specular', 1: 'Lobe', 2: 'Backscatter', 3: 'Lambertian', 4: 'Segment'}
     if verbose > 0:
         for aref in set(whichreflection):
-            print(
-                namedict[aref],
-                len(whichreflection[whichreflection == aref]))
+            print(namedict[aref], len(whichreflection[whichreflection == aref]))
 
     newdirection = zeros(shape(olddirection))  # newdirection
 
@@ -429,10 +426,8 @@ def UpdateDirection(olddirection, faces, ndots, aBox, verbose=0):
 
             newdirection[Condition, ...] = _getnewdirection(
                 aref, olddirection[Condition, ...],
-                ndots[
-                    Condition,
-                    ...],
-                surfacenormal, verbose=verbose)
+                ndots[Condition, ...],
+                surfacenormal, aBox.mat[uniqueface], verbose=verbose)
 
     if verbose > 1:
         print("--Update Direction--")

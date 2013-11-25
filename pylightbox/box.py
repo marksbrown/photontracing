@@ -14,7 +14,7 @@ from numpy import arcsin, sin, dot, subtract, linalg, cos, array, cumsum, isnan
 from numpy import tan, zeros, shape
 from itertools import combinations
 from .const import *
-
+from .generic import *
 
 class Box():  # Box Properties
 
@@ -33,7 +33,7 @@ class Box():  # Box Properties
     This system isn't strictly speaking, limited to 6 faces
     '''
 
-    def __init__(self, n, cn, sn, sp, faces, ci, ref, unified, name=""):
+    def __init__(self, n, cn, sn, sp, faces, materials, name=""):
         self.n = n  # refractive index of box
         self.corners = cn  # corners (for drawing frame only)
 
@@ -42,10 +42,7 @@ class Box():  # Box Properties
         self.points = array(sp)  # surface points
         self.name = name  # name of box
         self.face = faces  # names of each face
-        self.couplingindices = ci  # refractive index outside each face
-        self.reflectivity = ref  # relectivity for each face
-        self.unified = {key: cumsum(unified[key]) for key in unified}
-            #[specular,lobe,backscatter,lambertian]
+        self.mat = materials
 
     def __repr__(self):
         return self.name
@@ -55,25 +52,17 @@ class Box():  # Box Properties
         Retrieves unified parameters for a chosen face of form
         [specular,lobe,backscatter,lambertian]
         '''
-        if face < 0:
-            return [1, 0, 0, 0]  # purely specular
-        else:
-            return self.unified[face]
+        
+        return self.mat[face].surface
 
     def Crit(self, face=-1):
         '''
         Returns the critical angle at facet
         '''
-        if face < 0:
-            return arcsin(1 / self.n)
-        else:
-            return arcsin(self.couplingindices[face] / self.n)
+        return arcsin(self.mat[face].n / self.n)
 
     def Ref(self, face):
-        return self.reflectivity[face]
-
-    def OuterIndex(self, face):
-        return self.couplingindices[face]
+        return self.mat[face].reflectivity
 
     def SurfaceNormal(self, face):
         return self.normals[face]
@@ -89,7 +78,7 @@ class Box():  # Box Properties
         n1 = self.n
         n2 = zeros(shape(faces))
         for uniqueface in set(faces):
-            n2[faces == uniqueface] = self.OuterIndex(uniqueface)
+            n2[faces == uniqueface] = self.mat[uniqueface].n
 
         r = arcsin(n1 / n2 * sin(i))
 
@@ -134,26 +123,10 @@ class Box():  # Box Properties
                     axis.plot(x, y, z, 'k-', lw=2, alpha=0.2)
 
         axis.set_title(self)  # overly complicated nonsense you pillock
-        tocube(axis)
+        labelaxes(axis)
 
 
-def tocube(axis, defaultunit=mm):
-
-    # axis.set_xlim(0,anum)
-    # axis.set_ylim(0,anum)
-    # axis.set_zlim(0,anum)
-
-    axis.set_xticklabels(axis.get_xticks() / defaultunit)
-    axis.set_yticklabels(axis.get_yticks() / defaultunit)
-    axis.set_zticklabels(axis.get_zticks() / defaultunit)
-
-    axis.set_xlabel("x (mm)")
-    axis.set_ylabel("y (mm)")
-    axis.set_zlabel("z (mm)")
-
-
-def TwoFacesBox(L, rindex=2, couplingindices={0: 1, 1: 1}, ref={0: 0, 1: 0},
-                unified={0: [1, 0, 0, 0], 1: [1, 0, 0, 0]}):
+def TwoFacesBox(L, rindex, materials):
     '''
     Two Infinite Faces separated by a distance L
     '''
@@ -161,17 +134,14 @@ def TwoFacesBox(L, rindex=2, couplingindices={0: 1, 1: 1}, ref={0: 0, 1: 0},
     Points = [[L, 0, 0], [0, 0, 0]]
     Corners = [[0, 0, 0], [L, 0, 0], [0, L, 0],
                [L, L, 0], [0, 0, L], [L, 0, L], [0, L, L], [L, L, L]]
-    Facets = {0: "positive x", 1: "negative x"}
+    Facenames = {0: "positive x", 1: "negative x"}
     return (
-        Box(rindex, Corners, Normals, Points, Facets,
-            couplingindices, ref, unified, name="Two Infinite Faces")
+        Box(rindex, Corners, Normals, Points, Facenames,
+            materials, name="Two Infinite Faces")
     )
 
 
-def RegularCuboidBox(
-    LX, LY, LZ, rindex=2, couplingindices={0: 1, 1: 1, 2: 1, 3: 1, 4: 1, 5: 1},
-    ref={0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
-        unified={0: [1, 0, 0, 0], 1: [1, 0, 0, 0], 2: [1, 0, 0, 0], 3: [1, 0, 0, 0], 4: [1, 0, 0, 0], 5: [1, 0, 0, 0]}):
+def RegularCuboidBox(LX, LY, LZ, rindex, materials):
     '''
     Creates regular cuboid
     LX,LY,LZ : lengths of x,y,z
@@ -182,7 +152,7 @@ def RegularCuboidBox(
               [0, 0, 0], [LX, LY, LZ], [0, 0, 0]]
     Corners = [[0, 0, 0], [LX, 0, 0], [0, LY, 0], [0, 0, LZ],
                [LX, LY, 0], [LX, 0, LZ], [0, LY, LZ], [LX, LY, LZ]]
-    Facets = {
+    Facenames = {
         0: "positive x",
         1: "negative x",
         2: "positive y",
@@ -190,15 +160,12 @@ def RegularCuboidBox(
         4: "positive z",
         5: "negative z"}
     return (
-        Box(rindex, Corners, Normals, Points, Facets,
-            couplingindices, ref, unified, name="Regular Cuboid")
+        Box(rindex, Corners, Normals, Points, Facenames,
+            materials, name="Regular Cuboid")
     )
 
 
-def RaisedTopBox(
-    LX, LY, LZ, ThetaX, rindex=2, couplingindices={0: 1, 1: 1, 2: 1, 3: 1, 4: 1, 5: 1},
-    ref={0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
-        unified={0: [1, 0, 0, 0], 1: [1, 0, 0, 0], 2: [1, 0, 0, 0], 3: [1, 0, 0, 0], 4: [1, 0, 0, 0], 5: [1, 0, 0, 0]}):
+def RaisedTopBox(LX, LY, LZ, ThetaX, rindex, materials):
     '''
     Creates box with raised top edge
     LX,LY,LZ : lengths of x,y,z
@@ -211,7 +178,7 @@ def RaisedTopBox(
               [0, 0, 0], [LX, LY, LZ], [0, 0, 0]]
     Corners = [[0, 0, 0], [LX, 0, 0], [0, LY, 0], [0, 0, LZ],
                [LX, LY, 0], [LX, 0, LZPrime], [0, LY, LZ], [LX, LY, LZPrime]]
-    Facets = {
+    Facenames = {
         0: "positive x",
         1: "negative x",
         2: "positive y",
@@ -219,15 +186,12 @@ def RaisedTopBox(
         4: "positive z",
         5: "negative z"}
     return (
-        Box(rindex, Corners, Normals, Points, Facets,
-            couplingindices, ref, unified, name="Raised Top Edge")
+        Box(rindex, Corners, Normals, Points, Facenames,
+            materials, name="Raised Top Edge")
     )
 
 
-def TrapeziumBox(
-    LX, LY, LZ, ThetaX, ThetaY, rindex=2, couplingindices={0: 1, 1: 1, 2: 1, 3: 1, 4: 1, 5: 1},
-    ref={0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
-        unified={0: [1, 0, 0, 0], 1: [1, 0, 0, 0], 2: [1, 0, 0, 0], 3: [1, 0, 0, 0], 4: [1, 0, 0, 0], 5: [1, 0, 0, 0]}):
+def TrapeziumBox(LX, LY, LZ, ThetaX, ThetaY, rindex, materials):
     '''
     Creates irregular trapezium
     LX,LY,LZ : lengths of x,y,z
@@ -241,7 +205,7 @@ def TrapeziumBox(
                [0, -cos(ThetaY), -sin(ThetaY)], [0, cos(ThetaY), -sin(ThetaY)], [0, 0, 1], [0, 0, -1]]
     Points = [[LX, LY, LZ], [0, 0, 0], [LX, LY, LZ],
               [0, 0, 0], [LX, LY, LZ], [0, 0, 0]]
-    Facets = {
+    Facenames = {
         0: "positive x",
         1: "negative x",
         2: "positive y",
@@ -249,6 +213,6 @@ def TrapeziumBox(
         4: "positive z",
         5: "negative z"}
     return (
-        Box(rindex, Corners, Normals, Points, Facets,
-            couplingindices, ref, unified, name="Trapezium")
+        Box(rindex, Corners, Normals, Points, Facenames,
+            materials, name="Trapezium")
     )
