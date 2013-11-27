@@ -18,6 +18,12 @@ from scipy import stats
 from pandas import DataFrame
 from .const import *
 
+def rndchoice(M,N):
+    '''
+    returns N random numbers from the range 0 to M
+    ''' 
+    return random.randint(0,M,N)
+
 def lazydot(u, v):
     return (u[0] * v[0]) + (u[1] * v[1]) + (u[2] * v[2])
 
@@ -190,7 +196,10 @@ def IsotropicSegmentReflection(N=1, surfacenormal=array([0, 0, 1]), mat=None,
         if fetchall:
             return RotateVectors(AllowedDirections, -surfacenormal, verbose)
         else:
-            indices = random.choice(range(len(AllowedDirections)), N)
+            try:
+                indices = random.choice(range(len(AllowedDirections)), N)
+            except AttributeError:
+                indices = rndchoice(len(AllowedDirections), N)
             return  (
                     RotateVectors(
                     AllowedDirections[indices],
