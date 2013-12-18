@@ -38,7 +38,7 @@ def PlotTime(axis, df, verbose=0, **kwargs):
 
     timerange = kwargs.pop('timerange',(0, 1000))
     xlabel = kwargs.pop("xlabel","time (ns)")
-    ylabel = kwargs.pop("ylabel","frequency")
+    ylabel = kwargs.pop("ylabel","Energy Density")
     dt = kwargs.pop('dt',1)
     Bins = ptp(timerange)/dt
 
