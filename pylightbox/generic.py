@@ -37,18 +37,19 @@ def labelaxes(axis, defaultunit=mm):
 def PlotTime(axis, df, verbose=0, **kwargs):
 
     timerange = kwargs.pop('timerange',(0, 1000))
+    xlabel = kwargs.pop("xlabel","time (ns)")
     ylabel = kwargs.pop("ylabel","frequency")
     dt = kwargs.pop('dt',1)
     Bins = ptp(timerange)/dt
 
-    if verbose > 0:    
+    if verbose > 0:  
         print("Energy in plot is :",sum(df.energy)*1e2,"%")
-
-    axis.hist(df.time/ps,range=timerange,bins=Bins, weights=df.energy,**kwargs)
-    #axis.hist(df.time/ps,range=timerange,bins=Bins,**kwargs)
+    
+    axis.hist(df.time,range=timerange,bins=Bins, weights=df.energy,**kwargs)
+    
     axis.grid(True)
     axis.set_xlim(timerange)
-    axis.set_xlabel("time (ps)")
+    axis.set_xlabel(xlabel)
     axis.set_ylabel(ylabel)
     
 

@@ -301,7 +301,7 @@ def NearestFace(Directions, Positions, aBox, verbose=0, threshold=1e-15):
         print("--Nearest Face--")
         print("face index : distanceto")
         for f, dst in zip(Faces, DistanceTo):
-            print(f, ":", dst)
+            print(f, ":", dst/mm,"mm", aBox.n * dst / SpeedOfLight / ps,"ps")
 
     return Faces, DistanceTo, nds
 
@@ -458,10 +458,11 @@ def UpdatePosition(oldposition, distanceto,
 
     if verbose > 1:
         print("--Update Position--")
-        for np, nt in zip(newposition, newtime):
-            print("New position : ", np)
-            print("Updated time : ", nt)
-
+        for np, ot, nt in zip(newposition, oldtime, newtime):
+            #print("New position : ", np)
+            print("prior time was : ", ot/ps,"ps")
+            print("Updated time : ", nt/ps,"ps")
+    
     return newposition, newtime
 
 

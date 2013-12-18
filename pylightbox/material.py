@@ -39,13 +39,13 @@ class Surface():
 def OneMaterial(materialA, faces=range(6)):
     return {fa : materialA for fa in facesA}
 
-def TwoMaterials(materialA, materialB, facesA=[4], facesB=range(4)+[5]):
+def TwoMaterials(materialA, materialB, facesA=[5], facesB=range(5)):
     A = {fa : materialA for fa in facesA}
     B = {fb : materialB for fb in facesB}
     
     return dict(A.items()+B.items())
 
-def ThreeMaterials(materialA, materialB, materialC, facesA=[4], facesB=[3], facesC=range(3)+[5]):
+def ThreeMaterials(materialA, materialB, materialC, facesA=[4], facesB=[5], facesC=range(4)):
     A = {fa : materialA for fa in facesA}
     B = {fb : materialB for fb in facesB}
     C = {fb : materialC for fb in facesC}
