@@ -512,6 +512,7 @@ def LightinaBox(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
     reflectivity = kwargs.get('reflectivity', True)
     fresnel = kwargs.get('fresnel', True)
     maxrepeat = kwargs.get('maxrepeat', 10)
+    outersurface = kwargs.get('outersurface',False)
     nothingescaped = 0
 
     ProcessedPhotons = []
@@ -527,20 +528,39 @@ def LightinaBox(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
 
         positions, times = UpdatePosition(positions, distanceto, times,
                                           directions, aBox, verbose=verbose)
-
-#        directions = UpdateDirection(directions, faces, ndots,
-#                                     aBox, verbose=verbose)
-
+        
+        #escape status for a polished uncoated surface --> 
+        #aBox.reflectivity is dealt with in the secondary escape status
         est = EscapeStatus(faces, ndots, aBox, fresnel=fresnel,
-                           reflectivity=reflectivity, verbose=verbose)
+                           reflectivity=False, verbose=verbose)
 
+        #only update directions of not escaping photons
         directions[invert(est),...] = UpdateSpecularDirection(directions[invert(est),...],
                                     faces[invert(est),...], 
                                     ndots[invert(est),...],
-                                     aBox,
-                                     verbose=verbose)
+                                     aBox, verbose=verbose)
+                                     
+        #don't touch invert(est) photons anymore
+                
 
+        if outersurface: #Considers a secondary outer surface (Fresnel is dealt with before!)
+            esc = ones(shape(faces),dtype=bool) #assume everything escapes
+            esc[est,...] = EscapeStatus(faces[est,...], 
+                                        ndots[est,...], 
+                                        aBox, fresnel=False,
+                                        reflectivity=reflectivity, verbose=verbose)
 
+            #if any photons are trapped            
+            #print(sum(invert(esc)),"photons trapped!")
+            if any(invert(esc)): #no photons are kept
+                #Photons STILL not escaping gain a new direction!
+                directions[invert(esc),...] = UpdateDirection(directions[invert(esc),...],
+                                        faces[invert(esc),...], 
+                                        ndots[invert(esc),...],
+                                         aBox, verbose=verbose)
+
+            est = est & esc #proper measure of what's what
+            
         if not any(est):
             nothingescaped += 1
 
