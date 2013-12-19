@@ -403,6 +403,26 @@ def _getnewdirection(key, olddirection, ndots, surfacenormal, mat, verbose=0):
         return
 
 
+def UpdateSpecularDirection(olddirection, faces, ndots, aBox, verbose=0):
+    '''
+    Updates directions using the specular model only
+    '''
+
+    newdirection = zeros(shape(olddirection))  # newdirection
+
+    for uniqueface in set(faces):
+        surfacenormal = aBox.normals[uniqueface]
+        Condition = (faces == uniqueface)
+        if not any(Condition):
+            continue
+
+        newdirection[Condition, ...] = _getnewdirection(
+            0, olddirection[Condition, ...],
+            ndots[Condition, ...],
+            surfacenormal, aBox.mat[uniqueface], verbose=verbose)
+
+    return newdirection
+
 def UpdateDirection(olddirection, faces, ndots, aBox, verbose=0):
     '''
     Calculates new direction for a given photon at a given face for a set
@@ -508,8 +528,11 @@ def LightinaBox(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
         positions, times = UpdatePosition(positions, distanceto, times,
                                           directions, aBox, verbose=verbose)
 
-        directions = UpdateDirection(directions, faces, ndots,
+        directions = UpdateSpecularDirection(directions, faces, ndots,
                                      aBox, verbose=verbose)
+
+#        directions = UpdateDirection(directions, faces, ndots,
+#                                     aBox, verbose=verbose)
 
         est = EscapeStatus(faces, ndots, aBox, fresnel=fresnel,
                            reflectivity=reflectivity, verbose=verbose)
