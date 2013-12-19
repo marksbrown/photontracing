@@ -12,7 +12,7 @@ from __future__ import print_function, division
 from numpy import array, dot, sin, cos, pi, ones, arccos
 from numpy import abs, random, zeros, where, sqrt, arcsin
 from numpy import shape, arctan2, dstack, newaxis, issubdtype
-from numpy import vstack, round, allclose
+from numpy import vstack, round, allclose, invert
 
 from scipy import stats
 from pandas import DataFrame
@@ -528,14 +528,18 @@ def LightinaBox(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
         positions, times = UpdatePosition(positions, distanceto, times,
                                           directions, aBox, verbose=verbose)
 
-        directions = UpdateSpecularDirection(directions, faces, ndots,
-                                     aBox, verbose=verbose)
-
 #        directions = UpdateDirection(directions, faces, ndots,
 #                                     aBox, verbose=verbose)
 
         est = EscapeStatus(faces, ndots, aBox, fresnel=fresnel,
                            reflectivity=reflectivity, verbose=verbose)
+
+        directions[invert(est),...] = UpdateSpecularDirection(directions[invert(est),...],
+                                    faces[invert(est),...], 
+                                    ndots[invert(est),...],
+                                     aBox,
+                                     verbose=verbose)
+
 
         if not any(est):
             nothingescaped += 1
