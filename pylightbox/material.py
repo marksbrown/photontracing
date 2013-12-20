@@ -45,7 +45,7 @@ def TwoMaterials(materialA, materialB, facesA=[5], facesB=range(5)):
     
     return dict(A.items()+B.items())
 
-def ThreeMaterials(materialA, materialB, materialC, facesA=[4], facesB=[5], facesC=range(4)):
+def ThreeMaterials(materialA, materialB, materialC, facesA=[5], facesB=[3], facesC=range(3)+[4]):
     A = {fa : materialA for fa in facesA}
     B = {fb : materialB for fb in facesB}
     C = {fb : materialC for fb in facesC}
