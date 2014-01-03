@@ -89,6 +89,8 @@ class Box():  # Box Properties
 
         rTE[isnan(rTE)] = 1
         rTM[isnan(rTM)] = 1
+        rTE[n1==n2] = 0
+        rTM[n1==n2] = 0
 
         return 0.5 * (rTE ** 2 + rTM ** 2)
 
