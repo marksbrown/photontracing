@@ -1,7 +1,7 @@
 from __future__ import print_function, division
 import os
 from .const import *
-from numpy import ptp
+from numpy import ptp, array
 
 
 def savefigure(name, loc, fig, Ext=['pdf', 'eps', 'png']):
@@ -45,7 +45,8 @@ def PlotTime(axis, df, verbose=0, **kwargs):
     if verbose > 0:  
         print("Energy in plot is :",sum(df.energy)*1e2,"%")
     
-    axis.hist(df.time,range=timerange,bins=Bins, weights=df.energy,**kwargs)
+    axis.hist(array(df.time), range=timerange,bins=Bins, 
+                weights=array(df.energy),**kwargs)
     
     axis.grid(True)
     axis.set_xlim(timerange)
