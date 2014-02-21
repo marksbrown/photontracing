@@ -273,6 +273,26 @@ def TestSource(Pos, aBox):
 
     return aBox.normals, array(list([Pos]) * 6), zeros(6)
 
+def vectorsnell(Directions, faces, aBox, verbose=0):
+    '''
+    Vectorised Snell Operation
+    '''
+    NewDirections = ones(shape(Directions))
+    for uniqueface in set(faces): #groupby surfacenormal
+        surfacenormal = aBox.normals[uniqueface]
+        Condition = (faces == uniqueface)
+        if not any(Condition):
+            continue
+
+        r = aBox.n / aBox.mat[uniqueface].n
+
+        a = dot(Directions[Condition], surfacenormal)
+    
+        nds = sqrt(1 - r**2*(1-a**2))
+    
+        NewDirections[Condition] = r*(n-a*sn)+nds*sn
+
+    return NewDirections
 
 def NearestFace(Directions, Positions, aBox, verbose=0, threshold=1e-15):
     '''
@@ -558,6 +578,9 @@ def LightinaBox(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
                                         faces[invert(esc),...], 
                                         ndots[invert(esc),...],
                                          aBox, verbose=verbose)
+
+                #Bend photons back towards the centre
+                #directions[invert(esc),...] = vectorsnell(directions[invert(esc),...], faces[est,...], n1, n2)
 
             est = est & esc #proper measure of what's what
             
