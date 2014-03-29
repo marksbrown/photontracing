@@ -19,9 +19,9 @@ from pandas import DataFrame
 from .const import *
 
 def rndchoice(M,N):
-    '''
+    """
     returns N random numbers from the range 0 to M
-    ''' 
+    """
     return random.randint(0,M,N)
 
 def lazydot(u, v):
@@ -229,6 +229,32 @@ def DirectionVector(theta=0 * Degrees, phi=0 * Degrees, amplitude=1, verbose=0):
         print("z", z)
 
     return dstack([x, y, z])
+
+def spherical_unit_vectors(theta=0, phi=0):
+    """
+    Spherical unit vectors as cartesian unit vectors
+    """
+    r = array((sin(theta) * cos(phi),
+               sin(theta) * sin(phi),
+               ones(shape(phi)) * cos(theta))).T
+    th = array((cos(theta) * cos(phi),
+                cos(theta) * sin(phi),
+                -1 * ones(shape(phi)) * sin(theta))).T
+    ph = array((-1 * ones(shape(theta)) * sin(phi),
+                ones(shape(theta)) * cos(phi),
+                zeros(shape(theta)) * zeros(shape(phi)))).T
+
+    return r, th, ph
+
+
+def radial_direction_vector(theta=0, phi=0, amplitude=1, verbose=0):
+    """
+    returns r unit vector in cartesian coordinates
+    """
+
+    return array((amplitude * sin(theta) * cos(phi),
+                  amplitude * sin(theta) * sin(phi),
+                  amplitude * ones(shape(phi)) * cos(theta))).T
 
 def _RandomPointsOnASphere(N, hemisphere=False, split=False):
     '''
