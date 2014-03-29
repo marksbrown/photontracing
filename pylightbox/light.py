@@ -1,4 +1,4 @@
-'''
+"""
 light.py
 
 Author : Mark S. Brown
@@ -7,31 +7,45 @@ First Commit : 3rd November 2013
 Description : In this module functionality required for ray tracing in geometry
 defined in _box_ is contained.
 
-'''
+"""
 from __future__ import print_function, division
-from numpy import array, dot, sin, cos, pi, ones, arccos
+from numpy import array, dot, sin, cos, ones, arccos, cross
 from numpy import abs, random, zeros, where, sqrt, arcsin
 from numpy import shape, arctan2, dstack, newaxis, issubdtype
-from numpy import vstack, round, allclose, invert
+from numpy import vstack, invert, add
 
-from scipy import stats
 from pandas import DataFrame
 from .const import *
 
-def rndchoice(M,N):
+def random_integer(M,N):
     """
     returns N random numbers from the range 0 to M
     """
     return random.randint(0,M,N)
 
-def lazydot(u, v):
+def dot_python(u, v):
+    """
+    Pure Python implementation of dot product
+    """
     return (u[0] * v[0]) + (u[1] * v[1]) + (u[2] * v[2])
 
+def cross_python(u, v):
+    """
+    Pure python implementation of cross product
+    """
+    return u[1]*v[2]-u[2]*v[1], u[2]*v[0] - u[0]*v[2], u[0]*v[1] - u[1]*v[0]
 
-def _RotateVector(v, phi=0, theta=0, psi=0, verbose=0):
-    '''
+
+def _rotate_vector(v, phi=0, theta=0, psi=0, verbose=0):
+    """
     rotate vector 'v' using Euler Angles
-    '''
+    :rtype : list or array
+    :param v: (...,3) vector(s)
+    :param phi: yaw
+    :param theta: pitch
+    :param psi: roll?
+    :param verbose: verbosity control
+    """
 
     # http://stackoverflow.com/questions/19470955/warping-an-image-using-roll-pitch-and-yaw
     warp_mat = lambda theta, psy, phi: array(
@@ -54,13 +68,13 @@ def _RotateVector(v, phi=0, theta=0, psi=0, verbose=0):
 
 
 def RotateVectors(vectors, rotateto=array([0, 0, 1]), verbose=0):
-    '''
+    """
     Orient vector(s) to _rotateto_ as z direction
-    '''
+    """
     theta = lambda adir: arccos(adir[..., 2])
     phi = lambda adir: arctan2(adir[..., 1], adir[..., 0])
 
-    return _RotateVector(vectors,
+    return _rotate_vector(vectors,
                          phi=0,
                          theta=-theta(rotateto),
                          psi=-phi(rotateto),
@@ -68,10 +82,10 @@ def RotateVectors(vectors, rotateto=array([0, 0, 1]), verbose=0):
 
 
 def _SampledDirection(N, loc, scale, dist, verbose=0):
-    '''
+    """
     Generate N beams with profile given by the distribution with
     known scale and loc parameters
-    '''
+    """
 
     Theta = dist(loc=loc, scale=scale).rvs(N)  # sampled theta
     Phi = random.uniform(-1, 1, N) * pi  # uniform phi
@@ -94,49 +108,49 @@ def _SampledDirection(N, loc, scale, dist, verbose=0):
 
 
 def SpecularReflection(olddirection, surfacenormal, ndots, verbose=0):
-    '''
+    """
     Specular (mirror-like) Reflection
-    '''
-    newdirection = olddirection - 2 * ndots[:, newaxis] * surfacenormal
+    """
+    try:
+        newdirection = olddirection - 2 * ndots[:, newaxis] * surfacenormal
+    except IndexError:
+        newdirection = olddirection - 2 * ndots * surfacenormal
 
     return newdirection
 
+def LobeReflection(N, olddirection, surfacenormal, scale=1.3*Degrees, **kwargs):
+    """
+    Deviation from specular reflection by a chosen amount (defaults to normal)
 
-def LobeReflection(N=1, newdirection=array(
-        [0, 0, 1]), stddev=0 * Degrees, verbose=0):
-    '''
-    Gives normal distribution with a standard deviation of 1.3 degrees
-    (corresponding to a polished surface - Moses2010)
+    --args--
+    N : number of photons to produce
+    incoming_vector : vector from incident photon
+    surface normal : surface normal of surface
+    scale : size parameter for deviation vector
 
-    orient to specular direction
-    '''
+    --kwargs--
+    dist : distribution function of form f(N, scale) which returns a series of amplitudes
+    verbose : verbosity control
+    """
 
-    sampledirection = _SampledDirection(
-        N, loc=0, scale=stddev, dist=stats.norm,
-        verbose=verbose)
+    dist = kwargs.get("dist", lambda n, scale : scale*random.randn(N)) #defaults to random normal distribution
+    verbose = kwargs.get("verbose", 0)
 
-    orienteddirection = RotateVectors(sampledirection, newdirection, verbose)
+    outgoing_vector = SpecularReflection(olddirection, surfacenormal, dot(olddirection, surfacenormal), verbose)
 
-    if verbose > 1:
-        print("--LobeReflection--")
-        print("Sampled direction :", round(sampledirection, 2))
-        print("Orient vector to :", round(newdirection, 2))
-        print("Oriented direction :", round(orienteddirection, 2))
+    t2 = cross(outgoing_vector, olddirection) #perpendicular to plane
+    t3 = cross(t2, outgoing_vector) #parallel to plane
 
-    if stddev == 0:
-        if not allclose(newdirection, orienteddirection):
-            print("?!")
-        assert not allclose(newdirection, orienteddirection), "Specular reflections don't match!"
-
-    return orienteddirection
+    amplitudes = dist(N, scale)
+    return 1/sqrt(1+amplitudes**2)[...,newaxis] * add(outgoing_vector, [anamplitude*(U*t2+sqrt(1-U**2)*t3) for U, anamplitude in zip(random.rand(N), amplitudes)])
 
 
 def LambertianReflection(N=1, surfacenormal=array([0, 0, 1]), verbose=0):
-    '''
+    """
     Gives Lambertian distribution
 
     orients to surface normal
-    '''
+    """
 
     class thetadist:
 
@@ -157,11 +171,11 @@ def LambertianReflection(N=1, surfacenormal=array([0, 0, 1]), verbose=0):
 
 
 def IsotropicReflection(N=1, surfacenormal=array([0, 0, 1]), verbose=0):
-    '''
+    """
     no preferred direction hemispherical emission
 
     orients to surface normal
-    '''
+    """
     adirection = _RandomPointsOnASphere(N, hemisphere=True)
 
     return RotateVectors(adirection, -surfacenormal, verbose)
@@ -169,9 +183,9 @@ def IsotropicReflection(N=1, surfacenormal=array([0, 0, 1]), verbose=0):
 
 def IsotropicSegmentReflection(N=1, surfacenormal=array([0, 0, 1]), mat=None,
                                fetchall=False, verbose=0):
-    '''
+    """
     Returns N directions from sphere point picking (Marsaglia 1972)
-    '''
+    """
 
     while True:
         ListOfDirections = GenerateIsotropicList(N)
@@ -199,7 +213,7 @@ def IsotropicSegmentReflection(N=1, surfacenormal=array([0, 0, 1]), mat=None,
             try:
                 indices = random.choice(range(len(AllowedDirections)), N)
             except AttributeError:
-                indices = rndchoice(len(AllowedDirections), N)
+                indices = random_integer(len(AllowedDirections), N)
             return  (
                     RotateVectors(
                     AllowedDirections[indices],
@@ -209,9 +223,9 @@ def IsotropicSegmentReflection(N=1, surfacenormal=array([0, 0, 1]), mat=None,
 
 
 def DirectionVector(theta=0 * Degrees, phi=0 * Degrees, amplitude=1, verbose=0):
-    '''
+    """
     Spherical coordinates (r,theta,phi) --> cartesian coordinates (x,y,z)
-    '''
+    """
     if issubdtype(type(theta), float) and issubdtype(type(phi), float):
         return (
             array([sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta)])
@@ -257,10 +271,10 @@ def radial_direction_vector(theta=0, phi=0, amplitude=1, verbose=0):
                   amplitude * ones(shape(phi)) * cos(theta))).T
 
 def _RandomPointsOnASphere(N, hemisphere=False, split=False):
-    '''
+    """
     Generates random points on a sphere
     or on a hemisphere (default is sphere)
-    '''
+    """
     Values = []
 
     while len(Values) < N:
@@ -289,10 +303,10 @@ def GenerateIsotropicList(N):
 
 
 def IsotropicSource(N, Pos=[0, 0, 0]):
-    '''
+    """
     Returns a list of initial photons of size N
     direction, position, times
-    '''
+    """
     return _RandomPointsOnASphere(N), array(list([Pos]) * N), zeros(N)
 
 def TestSource(Pos, aBox):
@@ -300,9 +314,9 @@ def TestSource(Pos, aBox):
     return aBox.normals, array(list([Pos]) * 6), zeros(6)
 
 def vectorsnell(Directions, faces, aBox, verbose=0):
-    '''
+    """
     Vectorised Snell Operation
-    '''
+    """
     NewDirections = ones(shape(Directions))
     for uniqueface in set(faces): #groupby surfacenormal
         surfacenormal = aBox.normals[uniqueface]
@@ -321,10 +335,10 @@ def vectorsnell(Directions, faces, aBox, verbose=0):
     return NewDirections
 
 def NearestFace(Directions, Positions, aBox, verbose=0, threshold=1e-15):
-    '''
+    """
     returns the distance to the nearest face, the nearest face index and
     the angle with respect to the surface normal
-    '''
+    """
 
     nds = zeros(len(Directions))
     Faces = zeros(len(Directions))
@@ -334,7 +348,7 @@ def NearestFace(Directions, Positions, aBox, verbose=0, threshold=1e-15):
     for (i, sn), sp in zip(enumerate(aBox.normals), aBox.points):
         ndots = dot(Directions, sn)
         dmin = dot(Positions, sn)
-        dmin -= lazydot(sn, sp)
+        dmin -= dot_python(sn, sp)
         dmin = abs(dmin)
 
         DistanceToFace = dmin / ndots
@@ -353,13 +367,13 @@ def NearestFace(Directions, Positions, aBox, verbose=0, threshold=1e-15):
 
 
 def EscapeStatus(faces, ndots, aBox, reflectivity=True, fresnel=True, verbose=0):
-    '''
+    """
     Photons arriving at a surface will change status to 'trapped','escaped'
     or 'absorbed' based on order of events
     1st test : critical angle (trapped if angle is within)
     2nd test : fresnel reflection
     3rd test : reflectivity parameter - this WILL override everything else
-    '''
+    """
 
     CritAngles = zeros(shape(faces))
     for uniqueface in set(faces):
@@ -406,20 +420,20 @@ def EscapeStatus(faces, ndots, aBox, reflectivity=True, fresnel=True, verbose=0)
 
 
 def _firsttrue(param):
-    '''
+    """
     Returns index of first true in sequential bool array
-    '''
+    """
     for j, p in enumerate(param):
         if p:
             return j
 
 
 def _getnewdirection(key, olddirection, ndots, surfacenormal, mat, verbose=0):
-    '''
+    """
     Returns newdirection based reflection model chosen by _key_
 
     newdirections should be oriented correctly here
-    '''
+    """
     if key == 0:  # specular
         return (
             SpecularReflection(
@@ -450,9 +464,9 @@ def _getnewdirection(key, olddirection, ndots, surfacenormal, mat, verbose=0):
 
 
 def UpdateSpecularDirection(olddirection, faces, ndots, aBox, verbose=0):
-    '''
+    """
     Updates directions using the specular model only
-    '''
+    """
 
     newdirection = zeros(shape(olddirection))  # newdirection
 
@@ -470,10 +484,10 @@ def UpdateSpecularDirection(olddirection, faces, ndots, aBox, verbose=0):
     return newdirection
 
 def UpdateDirection(olddirection, faces, ndots, aBox, verbose=0):
-    '''
+    """
     Calculates new direction for a given photon at a given face for a set
     of UNIFIED parameters
-    '''
+    """
 
     unifiedparameters = zeros((len(faces), 5))
 
@@ -515,9 +529,9 @@ def UpdateDirection(olddirection, faces, ndots, aBox, verbose=0):
 
 def UpdatePosition(oldposition, distanceto,
                    oldtime, directions, aBox, verbose=0):
-    '''
+    """
     Moves photons to new position
-    '''
+    """
 
     newposition = oldposition + distanceto[:, newaxis] * directions
     newtime = oldtime + aBox.n * distanceto / SpeedOfLight
@@ -544,7 +558,7 @@ def ToDataFrame(directions, positions, times, faces):
 
 
 def LightinaBox(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
-    '''
+    """
     Given known initial conditions we propagate photons through the chosen
     geometry
 
@@ -553,7 +567,7 @@ def LightinaBox(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
     itime : initial times
     aBox : Geometry object (see box.py)
     runs : number of `bounces' to attempt
-    '''
+    """
 
     reflectivity = kwargs.get('reflectivity', True)
     fresnel = kwargs.get('fresnel', True)
