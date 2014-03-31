@@ -4,7 +4,7 @@ from .const import *
 from numpy import ptp, array
 
 
-def savefigure(name, loc, fig, Ext=['pdf', 'eps', 'png']):
+def savefigure(name, loc, fig, Ext=('pdf', 'eps', 'png')):
     '''
     Saves figure to location given by rootloc/<ext>/<name>.<ext>
     '''
