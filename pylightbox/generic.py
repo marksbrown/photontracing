@@ -18,10 +18,11 @@ def savefigure(name, loc, fig, Ext=('pdf', 'eps', 'png')):
         saveloc = os.path.join(extloc, aname)
         fig.savefig(saveloc)
 
+
 def tocube(axis, anum=1):
-    axis.set_xlim(-anum,anum)
-    axis.set_ylim(-anum,anum)
-    axis.set_zlim(-anum,anum)
+    axis.set_xlim(-anum, anum)
+    axis.set_ylim(-anum, anum)
+    axis.set_zlim(-anum, anum)
 
 
 def labelaxes(axis, defaultunit=mm):

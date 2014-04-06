@@ -10,14 +10,13 @@ in geometries defined below. Several examples are given in this file.
 '''
 
 from __future__ import print_function, division
-from numpy import arcsin, sin, dot, subtract, linalg, cos, array, cumsum, isnan
+from numpy import arcsin, sin, dot, subtract, linalg, cos, isnan
 from numpy import tan, zeros, shape
 from itertools import combinations
-from .const import *
 from .generic import *
 
-class Box():  # Box Properties
 
+class Box():  # Box Properties
     '''
     Six sided irregular box class
 

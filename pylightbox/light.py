@@ -12,8 +12,7 @@ from __future__ import print_function, division
 from numpy import array, dot, sin, cos, ones, arccos, cross
 from numpy import abs, random, zeros, where, sqrt, arcsin
 from numpy import shape, arctan2, dstack, newaxis, issubdtype
-from numpy import vstack, invert, add
-
+from numpy import vstack, invert
 from pandas import DataFrame
 from .const import *
 
@@ -182,9 +181,6 @@ def LambertianReflection(N=1, surfacenormal=array([0, 0, 1]), verbose=0):
     adirection = _SampledDirection(N, loc=0, scale=0, dist=thetadist,
                                    verbose=verbose)
 
-    if verbose > 0:
-        print("Shape of lobe reflections is", shape(adirection))
-
     # rotate to -ve of surface normal --> photons orient into the bloody box
     return RotateVectors(adirection, -surfacenormal, verbose)
 
@@ -323,7 +319,7 @@ def GenerateIsotropicList(N):
     return _RandomPointsOnASphere(N, hemisphere=False)
 
 
-def IsotropicSource(N, Pos=[0, 0, 0]):
+def IsotropicSource(N, Pos=(0, 0, 0)):
     """
     Returns a list of initial photons of size N
     direction, position, times
@@ -352,7 +348,7 @@ def vectorsnell(Directions, faces, aBox, verbose=0):
 
         nds = sqrt(1 - r ** 2 * (1 - a ** 2))
 
-        NewDirections[Condition] = r * (n - a * sn) + nds * sn
+        NewDirections[Condition] = r * (aBox.n - a * surfacenormal) + nds * surfacenormal
 
     return NewDirections
 
@@ -473,7 +469,6 @@ def _getnewdirection(key, olddirection, ndots, surfacenormal, mat, verbose=0):
         return IsotropicSegmentReflection(len(ndots), surfacenormal, mat)
     else:
         raise NotImplementedError("Unknown Reflection type!")
-        return
 
 
 def UpdateSpecularDirection(olddirection, faces, ndots, aBox, verbose=0):
@@ -511,11 +506,6 @@ def UpdateDirection(olddirection, faces, ndots, aBox, verbose=0):
 
     whichreflection = array([_firsttrue(ru < up) for (ru, up)
                              in zip(random.uniform(size=len(faces)), unifiedparameters)])
-
-    if verbose > 0:
-        print("--Which Reflection--")
-        for aref in set(whichreflection):
-            print(namedict[aref], len(whichreflection[whichreflection == aref]))
 
     newdirection = zeros(shape(olddirection))  # newdirection
 
@@ -591,12 +581,12 @@ def LightinaBox(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
 
     ProcessedPhotons = []
 
-    for runnum in range(runs):
-        if runnum == 0:
-            directions = idir
-            positions = ipos
-            times = itime
+    ##initial setup
+    directions = idir
+    positions = ipos
+    times = itime
 
+    for runnum in range(runs):
         faces, distanceto, ndots = NearestFace(directions, positions,
                                                aBox, verbose=verbose)
 
