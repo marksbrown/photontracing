@@ -9,7 +9,7 @@ defined in _box_ is contained.
 
 """
 from __future__ import print_function, division
-from numpy import array, dot, sin, cos, ones, arccos, cross
+from numpy import array, dot, sin, cos, ones, arccos, cross, mean, std, inner
 from numpy import abs, random, zeros, where, sqrt, arcsin
 from numpy import shape, arctan2, dstack, newaxis, issubdtype
 from numpy import vstack, invert
@@ -339,16 +339,21 @@ def vectorsnell(Directions, faces, aBox, verbose=0):
     for uniqueface in set(faces):  #groupby surfacenormal
         surfacenormal = aBox.normals[uniqueface]
         Condition = (faces == uniqueface)
+
         if not any(Condition):
             continue
 
-        r = aBox.n / aBox.mat[uniqueface].n
 
-        a = dot(Directions[Condition], surfacenormal)
+        ratio_of_indices = aBox.n / aBox.mat[uniqueface].n
+        direction_dot_surfacenormal = dot(Directions[Condition], surfacenormal)
+        nds = sqrt(1 - ratio_of_indices ** 2 * (1 - direction_dot_surfacenormal ** 2))
 
-        nds = sqrt(1 - r ** 2 * (1 - a ** 2))
+        NewDirections[Condition] = ratio_of_indices * (Directions[Condition] - direction_dot_surfacenormal[..., newaxis] * surfacenormal) + nds[..., newaxis] * surfacenormal
 
-        NewDirections[Condition] = r * (aBox.n - a * surfacenormal) + nds * surfacenormal
+        if verbose > 0:
+            print(shape(Directions), shape(NewDirections))
+            angles = arccos(inner(Directions, NewDirections))
+            print("{} +/- {} Degrees".format(mean(angles), std(angles)))
 
     return NewDirections
 
@@ -385,7 +390,7 @@ def NearestFace(Directions, Positions, aBox, verbose=0, threshold=1e-15):
     return Faces, DistanceTo, nds
 
 
-def EscapeStatus(faces, ndots, aBox, reflectivity=True, fresnel=True, verbose=0):
+def EscapeStatus(faces, ndots, aBox, reflectivity=True, fresnel=True, surface_layer='inner', verbose=0):
     """
     Photons arriving at a surface will change status to 'trapped','escaped'
     or 'absorbed' based on order of events
@@ -399,43 +404,38 @@ def EscapeStatus(faces, ndots, aBox, reflectivity=True, fresnel=True, verbose=0)
         CritAngles[faces == uniqueface] = aBox.Crit(uniqueface)
 
     angles = array([arccos(aval) for aval in ndots])
-    escapestatus = angles < CritAngles
+    escape_status = angles < CritAngles  # Incident angle less than critical angle?
 
-    if verbose > 1:
+    if verbose > 0:
         print("--Critical--")
-        print("incident angle : Escaped?")
-        for ang, esc in zip(angles, escapestatus):
-            print(ang, ":", esc)
-        print("Escaping", sum(escapestatus == True))
+        print("Escaping", sum(escape_status))
 
     if fresnel:
         Fresnel = aBox.Fresnel(faces, angles)
         ru = random.uniform(size=len(faces))
-        escapestatus &= (array(Fresnel) < ru)
+        escape_status &= (Fresnel < ru)  # Reflection coefficient less than
 
-        if verbose > 1:
+        if verbose > 0:
             print("--Fresnel--")
-            print("Reflectance : Escaped?")
-            for fr, esc in zip(Fresnel, escapestatus):
-                print(fr, ":", esc)
-            print("Escaping", sum(escapestatus == True))
+            print("Escaping", sum(escape_status))
 
     if reflectivity:
         Reflectivities = zeros(shape(faces))
         for uniqueface in set(faces):
-            Reflectivities[faces == uniqueface] = aBox.Ref(uniqueface)
+            Reflectivities[faces == uniqueface] = aBox.Ref(uniqueface, surface_layer)
 
         ru = random.uniform(size=len(faces))
-        escapestatus &= (array(Reflectivities) < ru)
+        escape_status &= (Reflectivities < ru)
 
-        if verbose > 1:
+        if verbose > 0:
             print("--Reflectivity--")
             print("Reflectivity : Escaped?")
-            for rf, esc in zip(Reflectivities, escapestatus):
-                print(rf, ":", esc)
-            print("Escaping", sum(escapestatus == True))
+            print("Escaping", sum(escape_status))
 
-    return escapestatus  # if true, photon escapes
+    if verbose > 0:
+        print("{} photons incident with {} escaping".format(len(escape_status), sum(escape_status)))
+
+    return escape_status  # if true, photon escapes
 
 
 def _firsttrue(param):
@@ -492,7 +492,7 @@ def UpdateSpecularDirection(olddirection, faces, ndots, aBox, verbose=0):
     return newdirection
 
 
-def UpdateDirection(olddirection, faces, ndots, aBox, verbose=0):
+def UpdateDirection(olddirection, faces, ndots, aBox, surface_layer='inner', verbose=0):
     """
     Calculates new direction for a given photon at a given face for a set
     of UNIFIED parameters
@@ -502,7 +502,7 @@ def UpdateDirection(olddirection, faces, ndots, aBox, verbose=0):
 
     for uniqueface in set(faces):
         Condition = (faces == uniqueface)
-        unifiedparameters[Condition] = aBox.GetUnified(uniqueface)
+        unifiedparameters[Condition] = aBox.GetUnified(uniqueface, surface_layer)
 
     whichreflection = array([_firsttrue(ru < up) for (ru, up)
                              in zip(random.uniform(size=len(faces)), unifiedparameters)])
@@ -575,7 +575,6 @@ def LightinaBox(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
     reflectivity = kwargs.get('reflectivity', True)
     fresnel = kwargs.get('fresnel', True)
     maxrepeat = kwargs.get('maxrepeat', 10)
-    outersurface = kwargs.get('outersurface', False)
     specular_only = kwargs.get('specularonly', False)
     nothingescaped = 0
 
@@ -595,8 +594,8 @@ def LightinaBox(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
 
         #escape status for a polished uncoated surface --> 
         #aBox.reflectivity is dealt with in the secondary escape status
-        est = EscapeStatus(faces, ndots, aBox, fresnel=fresnel,
-                           reflectivity=False, verbose=verbose)
+        escaped_inner = EscapeStatus(faces, ndots, aBox, fresnel=fresnel,
+                                     reflectivity=False, verbose=verbose)
 
         #only update directions of not escaping photons
 
@@ -605,41 +604,53 @@ def LightinaBox(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
         else:
             direction_func = UpdateDirection
 
-        directions[invert(est), ...] = direction_func(directions[invert(est), ...],
-                                                               faces[invert(est), ...],
-                                                               ndots[invert(est), ...],
+        reflected_from_inner = invert(escaped_inner)
+
+        directions[reflected_from_inner, ...] = direction_func(directions[reflected_from_inner, ...],
+                                                               faces[reflected_from_inner, ...],
+                                                               ndots[reflected_from_inner, ...],
                                                                aBox, verbose=verbose)
 
-        #don't touch invert(est) photons anymore
-
-
-        if outersurface:  #Considers a secondary outer surface (Fresnel is dealt with before!)
-            esc = ones(shape(faces), dtype=bool)  #assume everything escapes
-            esc[est, ...] = EscapeStatus(faces[est, ...],
-                                         ndots[est, ...],
+        if hasattr(aBox, 'outer_materials'):
+            escaped_outer = EscapeStatus(faces,
+                                         ndots,
                                          aBox, fresnel=False,
-                                         reflectivity=reflectivity, verbose=verbose)
+                                         reflectivity=reflectivity,
+                                         surface_layer='outer',
+                                         verbose=verbose)
 
-            #if any photons are trapped            
-            #print(sum(invert(esc)),"photons trapped!")
-            if any(invert(esc)):  #no photons are kept
+            escaped = escaped_outer & escaped_inner
+            reflected_from_outer = invert(escaped_outer) & escaped_inner
+
+            assert not any(reflected_from_outer & reflected_from_inner), "inconsistent definition of reflections"
+
+            if verbose > 0:
+                print("{} photons reach the outer surface with {} escaping leading to {} reflected".format(sum(escaped_inner),
+                                                                                                           sum(escaped),
+                                                                                                           sum(reflected_from_outer)))
+
+            if any(reflected_from_outer):  # update direction of trapped photons from outer surface
                 #Photons STILL not escaping gain a new direction!
-                directions[invert(esc), ...] = UpdateDirection(directions[invert(esc), ...],
-                                                               faces[invert(esc), ...],
-                                                               ndots[invert(esc), ...],
-                                                               aBox, verbose=verbose)
+                directions[reflected_from_outer, ...] = UpdateDirection(directions[reflected_from_outer, ...],
+                                                                                faces[reflected_from_outer, ...],
+                                                                                ndots[reflected_from_outer, ...],
+                                                                                aBox, surface_layer='outer',
+                                                                                verbose=verbose)
 
-                #Bend photons back towards the centre
-                #directions[invert(esc),...] = vectorsnell(directions[invert(esc),...], faces[est,...], n1, n2)
+                ## Bend photons back towards the centre
+                directions[reflected_from_outer, ...] = vectorsnell(directions[reflected_from_outer, ...],
+                                                                    faces[reflected_from_outer, ...],
+                                                                    aBox, verbose=verbose)
 
-            est = est & esc  #proper measure of what's what
+        else:
+            escaped = escaped_inner
 
-        if not any(est):
+        if not any(escaped):
             nothingescaped += 1
 
         if verbose > 0:
             print("--Photons Escaped--")
-            print(runnum, ": Escaped", sum(est))
+            print(runnum, ": Escaped", sum(escaped))
             print("\n\n")
 
         ProcessedPhotons += [
@@ -647,11 +658,11 @@ def LightinaBox(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
              "xdir": float(xdir), "ydir": float(ydir), "zdir": float(zdir),
              "face": fc, "time": atime, "ndots": nds, "photonstatus": "Escaped"}
             for (xpos, ypos, zpos), (xdir, ydir, zdir), fc, atime, nds in
-            zip(positions[est], directions[est], faces[est], times[est], ndots[est])]
+            zip(positions[escaped], directions[escaped], faces[escaped], times[escaped], ndots[escaped])]
 
-        directions = directions[est == False]
-        positions = positions[est == False]
-        times = times[est == False]
+        directions = directions[escaped == False]
+        positions = positions[escaped == False]
+        times = times[escaped == False]
 
         if nothingescaped > maxrepeat:
             if verbose > 0:

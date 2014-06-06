@@ -1,4 +1,4 @@
-'''
+"""
 box.py
 
 Author : Mark S. Brown
@@ -7,7 +7,7 @@ First Commit : 3rd November 2013
 Description : In this module the _box_ class is defined along with associated
 functions. This will be used with the _light_ module to perform ray tracing
 in geometries defined below. Several examples are given in this file.
-'''
+"""
 
 from __future__ import print_function, division
 from numpy import arcsin, sin, dot, subtract, linalg, cos, isnan
@@ -17,7 +17,7 @@ from .generic import *
 
 
 class Box():  # Box Properties
-    '''
+    """
     Six sided irregular box class
 
     n : Refractive index (const with wavelength)
@@ -26,13 +26,13 @@ class Box():  # Box Properties
     sp : paired surface points for each surface normal
     faces : Dict of numbers for labelling each face
     ci : dict of coupling refractive indices for each face
-    unified : list of 4 parameters for UNIFIED model --> MUST sum to one
+    materials : surface material objects
 
     Note : each surfacenormal and surfacepoint must define a unique face.
     This system isn't strictly speaking, limited to 6 faces
-    '''
+    """
 
-    def __init__(self, n, cn, sn, sp, faces, materials, name=""):
+    def __init__(self, n, cn, sn, sp, faces, materials, name="", **kwargs):
         self.n = n  # refractive index of box
         self.corners = cn  # corners (for drawing frame only)
 
@@ -43,37 +43,50 @@ class Box():  # Box Properties
         self.face = faces  # names of each face
         self.mat = materials
 
+        if 'outer_materials' in kwargs:
+            self.outer_materials = kwargs['outer_materials']
+
     def __repr__(self):
         return self.name
 
-    def GetUnified(self, face=-1):
-        '''
+    def GetUnified(self, face, surface_layer='inner'):
+        """
         Retrieves unified parameters for a chosen face of form
         [specular,lobe,backscatter,lambertian]
-        '''
-        
-        return self.mat[face].surface
+        """
 
-    def Crit(self, face=-1):
-        '''
+        if surface_layer == 'inner':
+            return self.mat[face].surface
+        elif surface_layer == 'outer':
+            return self.outer_materials[face].surface
+
+    def Crit(self, face, surface_layer='inner'):
+        """
         Returns the critical angle at facet
-        '''
-        return arcsin(self.mat[face].n / self.n)
+        """
+        if surface_layer == 'inner':
+            return arcsin(self.mat[face].n / self.n)
+        elif surface_layer == 'outer':
+            return arcsin(self.outer_materials[face].n / self.mat[face].n)
 
-    def Ref(self, face):
-        return self.mat[face].reflectivity
+    def Ref(self, face, surface_layer='inner'):
+
+        if surface_layer == 'inner':
+            return self.mat[face].reflectivity
+        elif surface_layer == 'outer':
+            return self.outer_materials[face].reflectivity
 
     def SurfaceNormal(self, face):
         return self.normals[face]
 
     def Fresnel(self, faces, i):
-        '''
+        """
         Returns Fresnel reflectance for each face
 
         face : face indices
         i : incident angle
 
-        '''
+        """
         n1 = self.n
         n2 = zeros(shape(faces))
         for uniqueface in set(faces):
@@ -94,11 +107,11 @@ class Box():  # Box Properties
         return 0.5 * (rTE ** 2 + rTM ** 2)
 
     def PlotFrame(self, axis, threshold=1e-15, offset=(0, 0, 0), verbose=0):
-        '''
+        """
         plots a 3D wireframe of the box defined by the vertices and surface normals given
         Threshold : instead of ==0 we use < Threshold to allow for inaccuracies
         OffSet : shift in (x,y,z) to translate the frame where we want it
-        '''
+        """
 
         # Potential set of facets defining facet
         for X in combinations(self.corners, 4):
@@ -127,10 +140,10 @@ class Box():  # Box Properties
         labelaxes(axis)
 
 
-def TwoFacesBox(L, rindex, materials):
-    '''
+def TwoFacesBox(L, rindex, materials, **kwargs):
+    """
     Two Infinite Faces separated by a distance L
-    '''
+    """
     Normals = [[1, 0, 0], [-1, 0, 0]]
     Points = [[L, 0, 0], [0, 0, 0]]
     Corners = [[0, 0, 0], [L, 0, 0], [0, L, 0],
@@ -138,15 +151,15 @@ def TwoFacesBox(L, rindex, materials):
     Facenames = {0: "positive x", 1: "negative x"}
     return (
         Box(rindex, Corners, Normals, Points, Facenames,
-            materials, name="Two Infinite Faces")
+            materials, name="Two Infinite Faces", **kwargs)
     )
 
 
-def RegularCuboidBox(LX, LY, LZ, rindex, materials):
-    '''
+def RegularCuboidBox(LX, LY, LZ, rindex, materials, **kwargs):
+    """
     Creates regular cuboid
     LX,LY,LZ : lengths of x,y,z
-    '''
+    """
     Normals = [[1, 0, 0], [-1, 0, 0], [0, 1, 0],
                [0, -1, 0], [0, 0, 1], [0, 0, -1]]
     Points = [[LX, LY, LZ], [0, 0, 0], [LX, LY, LZ],
@@ -162,16 +175,16 @@ def RegularCuboidBox(LX, LY, LZ, rindex, materials):
         5: "negative z"}
     return (
         Box(rindex, Corners, Normals, Points, Facenames,
-            materials, name="Regular Cuboid")
+            materials, name="Regular Cuboid", **kwargs)
     )
 
 
-def RaisedTopBox(LX, LY, LZ, ThetaX, rindex, materials):
-    '''
+def RaisedTopBox(LX, LY, LZ, ThetaX, rindex, materials, **kwargs):
+    """
     Creates box with raised top edge
     LX,LY,LZ : lengths of x,y,z
     ThetaX : Angle box deviates from normal
-    '''
+    """
     LZPrime = LZ + LX * tan(ThetaX)
     Normals = [[1, 0, 0], [-1, 0, 0], [0, 1, 0],
                [0, -1, 0], [-sin(ThetaX), 0, cos(ThetaX)], [0, 0, -1]]
@@ -188,16 +201,16 @@ def RaisedTopBox(LX, LY, LZ, ThetaX, rindex, materials):
         5: "negative z"}
     return (
         Box(rindex, Corners, Normals, Points, Facenames,
-            materials, name="Raised Top Edge")
+            materials, name="Raised Top Edge", **kwargs)
     )
 
 
-def TrapeziumBox(LX, LY, LZ, ThetaX, ThetaY, rindex, materials):
-    '''
+def TrapeziumBox(LX, LY, LZ, ThetaX, ThetaY, rindex, materials, **kwargs):
+    """
     Creates irregular trapezium
     LX,LY,LZ : lengths of x,y,z
     ThetaX,ThetaY : Angles defining deviation from regular cuboid
-    '''
+    """
     DX = LZ * tan(ThetaX)
     DY = LZ * tan(ThetaY)
     Corners = [[0, 0, 0], [LX, 0, 0], [0, LY, 0], [LX, LY, 0],
@@ -215,5 +228,5 @@ def TrapeziumBox(LX, LY, LZ, ThetaX, ThetaY, rindex, materials):
         5: "negative z"}
     return (
         Box(rindex, Corners, Normals, Points, Facenames,
-            materials, name="Trapezium")
+            materials, name="Trapezium", **kwargs)
     )

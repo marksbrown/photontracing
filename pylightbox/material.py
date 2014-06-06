@@ -4,32 +4,26 @@ from .const import *
 
 
 class Surface():
-    '''
-    Outer surface materials
+    """
+    Surface material description
 
     n : refractive index (for critical angle and fresnel)
-    '''
+    ref : absorptivity parameter
+    name : name of material
+    surface model : 'Specular', 'Lobe', 'Backscatter', 'Lambertian', 'Segment'
+    """
 
-    def __init__(self, n, ref, name="", **kwargs):
+    def __init__(self, n, ref=0, name="", **kwargs):
         self.n = n  # refractive index of material
         self.name = name  # name of material
-        self.reflectivity = ref  # reflectivity 
 
-        if 'unified' in kwargs:
-            #UNIFIED Model : specular,lobe, back-scatter, Lambertian
-            self.surface = cumsum(kwargs.get('unified', [1, 0, 0, 0, 0]))
-            assert len(self.surface) == 5, "Incorrect number of parameters passed"
-            self.lobeangle = kwargs.get('lobeangle', 0*Degrees)
-        elif 'extended in kwargs':
-            self.surface = cumsum(kwargs.get('extended', [1, 0, 0, 0, 0]))
-            assert len(self.surface) == 5, "Incorrect number of parameters passed"
-            self.lobeangle = kwargs.get('lobeangle', 0*Degrees)
-            self.mintheta = kwargs.get('mintheta', 0*Degrees)
-            self.maxtheta = kwargs.get('maxtheta', 90*Degrees)
-            assert self.mintheta >= 0, "Minimum theta is negative - not allowed!"
-            assert self.maxtheta <= 90*Degrees, "Maximum theta is > 90 - not allowed!"
-        else:
-            self.surface = [1, 0, 0, 0, 0]  # defaults to specular
+        self.reflectivity = ref  # reflectivity
+        self.lobeangle = kwargs.get('lobeangle', 1.3*Degrees)  # doi: 10.1109/TNS.2010.2042731
+        self.surface = cumsum(kwargs.get('unified', [1, 0, 0, 0, 0]))  # defaults to specular
+        self.mintheta = kwargs.get('mintheta', 0*Degrees)
+        self.maxtheta = kwargs.get('maxtheta', 90*Degrees)
+        assert self.mintheta >= 0, "Minimum theta is negative - not allowed!"
+        assert self.maxtheta <= 90*Degrees, "Maximum theta is > 90 - not allowed!"
 
     def __repr__(self):
         return self.name
