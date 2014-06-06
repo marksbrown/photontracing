@@ -5,9 +5,9 @@ from numpy import ptp, array
 
 
 def savefigure(name, loc, fig, Ext=('pdf', 'eps', 'png')):
-    '''
+    """
     Saves figure to location given by rootloc/<ext>/<name>.<ext>
-    '''
+    """
 
     for ext in Ext:
         extloc = os.path.join(loc, ext)
