@@ -337,7 +337,7 @@ def vectorsnell(Directions, faces, aBox, verbose=0):
     """
     NewDirections = ones(shape(Directions))
     for uniqueface in set(faces):  #groupby surfacenormal
-        surfacenormal = aBox.normals[uniqueface]
+        surfacenormal = aBox.normals[uniqueface]*-1
         Condition = (faces == uniqueface)
 
         if not any(Condition):
@@ -500,6 +500,9 @@ def UpdateDirection(olddirection, faces, ndots, aBox, surface_layer='inner', ver
 
     unifiedparameters = zeros((len(faces), 5))
 
+    if verbose > 0:
+        print("The unified parameters for the {} surface are {}".format(surface_layer, aBox.GetUnified(0, surface_layer)))
+
     for uniqueface in set(faces):
         Condition = (faces == uniqueface)
         unifiedparameters[Condition] = aBox.GetUnified(uniqueface, surface_layer)
@@ -514,6 +517,8 @@ def UpdateDirection(olddirection, faces, ndots, aBox, surface_layer='inner', ver
         # faces x numunified (6 x 4 groups for a cube!)
         for aref in set(whichreflection):
             Condition = (faces == uniqueface) & (whichreflection == aref)
+            if verbose > 1:
+                print("There are {} photons with {} reflection key".format(sum(Condition), aref))
             if not any(Condition):
                 continue
 
@@ -586,6 +591,9 @@ def LightinaBox(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
     times = itime
 
     for runnum in range(runs):
+        if verbose > 1:
+            print("Onto {} run".format(runnum))
+
         faces, distanceto, ndots = NearestFace(directions, positions,
                                                aBox, verbose=verbose)
 
