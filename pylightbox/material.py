@@ -10,7 +10,14 @@ class Surface():
     n : refractive index (for critical angle and fresnel)
     ref : absorptivity parameter
     name : name of material
-    surface model : 'Specular', 'Lobe', 'Backscatter', 'Lambertian', 'Segment'
+
+    --kwargs--
+    surface :  parameters defining probability of each kind of reflection
+    angle insensitive, overridden by specular_only keyword in main function
+    ('Specular', 'Lobe', 'Backscatter', 'Lambertian', 'Segment')
+
+    lobeangle : standard deviation of Gaussian Lobe Reflection
+    mintheta, maxtheta : spherical segment range of angles
     """
 
     def __init__(self, n, ref=0, name="", **kwargs):
@@ -19,7 +26,11 @@ class Surface():
 
         self.reflectivity = ref  # reflectivity
         self.lobeangle = kwargs.get('lobeangle', 1.3*Degrees)  # doi: 10.1109/TNS.2010.2042731
-        self.surface = cumsum(kwargs.get('unified', [1, 0, 0, 0, 0]))  # defaults to specular
+
+        surface_parameters = kwargs.get('surface', (1, 0, 0, 0, 0))
+        surface_parameters = cumsum(surface_parameters)/sum(surface_parameters)
+        self.surface = surface_parameters  # defaults to specular
+
         self.mintheta = kwargs.get('mintheta', 0*Degrees)
         self.maxtheta = kwargs.get('maxtheta', 90*Degrees)
         assert self.mintheta >= 0, "Minimum theta is negative - not allowed!"
