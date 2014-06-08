@@ -577,6 +577,7 @@ def LightinaBox(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
     runs : number of `bounces' to attempt
     """
 
+    enable_snell = kwargs.get('enable_snell', True)
     reflectivity = kwargs.get('reflectivity', True)
     fresnel = kwargs.get('fresnel', True)
     maxrepeat = kwargs.get('maxrepeat', 10)
@@ -646,9 +647,10 @@ def LightinaBox(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
                                                                                 verbose=verbose)
 
                 ## Bend photons back towards the centre
-                directions[reflected_from_outer, ...] = vectorsnell(directions[reflected_from_outer, ...],
-                                                                    faces[reflected_from_outer, ...],
-                                                                    aBox, verbose=verbose)
+                if enable_snell:
+                    directions[reflected_from_outer, ...] = vectorsnell(directions[reflected_from_outer, ...],
+                                                                        faces[reflected_from_outer, ...],
+                                                                        aBox, verbose=verbose)
 
         else:
             escaped = escaped_inner
