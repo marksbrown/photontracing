@@ -1,25 +1,27 @@
 from __future__ import print_function, division
 import os
-from .const import *
+
 from numpy import ptp, array
 
+from .const import *
 
-def savefigure(name, loc, fig, Ext=('pdf', 'eps', 'png')):
+
+def save_figure(name, loc, fig, file_extensions=('pdf', 'eps', 'png')):
     """
     Saves figure to location given by rootloc/<ext>/<name>.<ext>
     """
 
-    for ext in Ext:
+    for ext in file_extensions:
         extloc = os.path.join(loc, ext)
         if not os.path.exists(extloc):
             os.makedirs(extloc)
-        
+
         aname = name + '.' + ext
         saveloc = os.path.join(extloc, aname)
         fig.savefig(saveloc)
 
 
-def tocube(axis, anum=1):
+def _to_cube(axis, anum=1):
     axis.set_xlim(-anum, anum)
     axis.set_ylim(-anum, anum)
     axis.set_zlim(-anum, anum)
@@ -53,26 +55,27 @@ def plot_time(axis, df, **kwargs):
     ylabel = kwargs.pop("ylabel", "Energy Density")
     dt = kwargs.pop('dt', 1)
     verbose = kwargs.pop('verbose', 0)
-    bins = ptp(time_range)/dt
+    bins = ptp(time_range) / dt
 
     if verbose > 0:
         energy_in_plot = df[(df.time > min(time_range)) & (df.time < max(time_range))].energy.sum()
-        print("Total energy in plot is {:2.1f} %".format(energy_in_plot*1e2))
+        print("Total energy in plot is {:2.1f} %".format(energy_in_plot * 1e2))
         #print("Energy in plot is :",sum(df.energy)*1e2,"%")
-    
+
     axis.hist(array(df.time), range=time_range, bins=bins,
-                weights=array(df.energy), **kwargs)
+              weights=array(df.energy), **kwargs)
 
     axis.set_xlim(time_range)
     axis.set_xlabel(xlabel)
     axis.set_ylabel(ylabel)
-    
 
-def PlotAngle(axis, df, verbose=0, **kwargs):
-    
-    axis.hist(df.angle/Degrees,range=(0,90),bins=91, weights=df.energy,**kwargs)
-    axis.grid(True)
+
+def plot_angle(axis, df, **kwargs):
+    """
+    Histogram of photon angles with respect to their final surface normal
+    """
+    Degrees = pi/180
+    number_of_bins = kwargs.pop('bins', 91)
+    axis.hist(df.angle / Degrees, range=(0, 90), bins=number_of_bins, weights=df.energy, **kwargs)
     axis.set_xlabel("Angle (Degrees)")
     axis.set_ylabel("frequency")
-
-    

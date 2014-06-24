@@ -9,22 +9,24 @@ defined in _box_ is contained.
 
 """
 from __future__ import print_function, division
+
 from numpy import array, dot, sin, cos, ones, arccos, cross, mean, std, inner
 from numpy import abs, random, zeros, where, sqrt, arcsin
 from numpy import shape, arctan2, dstack, newaxis, issubdtype
 from numpy import vstack, invert
 from pandas import DataFrame
+
 from .const import *
 
 
-def random_integers(M, N):
+def random_integers(m, n):
     """
-    returns N random numbers from the range 0 to M
+    returns n random numbers from the range 0 to m
     :rtype : list
-    :param M: max integer
-    :param N: number of integers to fetch
+    :param m: max integer
+    :param n: number of integers to fetch
     """
-    return random.randint(0, M, N)
+    return random.randint(0, m, n)
 
 
 def dot_python(u, v):
@@ -41,15 +43,9 @@ def cross_python(u, v):
     return u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]
 
 
-def _rotate_vector(v, phi=0, theta=0, psi=0, verbose=0):
+def _rotate_vector(v, phi=0, theta=0, psi=0):
     """
     rotate vector 'v' using Euler Angles
-    :rtype : list or array
-    :param v: (...,3) vector(s)
-    :param phi: yaw
-    :param theta: pitch
-    :param psi: roll?
-    :param verbose: verbosity control
     """
 
     # http://stackoverflow.com/questions/19470955/warping-an-image-using-roll-pitch-and-yaw
@@ -72,7 +68,7 @@ def _rotate_vector(v, phi=0, theta=0, psi=0, verbose=0):
         raise ValueError("dot product not working due to misalignment!")
 
 
-def RotateVectors(vectors, rotateto=array([0, 0, 1]), verbose=0):
+def rotate_vectors(vectors, rotate_to=array([0, 0, 1]), verbose=0):
     """
     Orient vector(s) to _rotateto_ as z direction
     """
@@ -81,50 +77,50 @@ def RotateVectors(vectors, rotateto=array([0, 0, 1]), verbose=0):
 
     return _rotate_vector(vectors,
                           phi=0,
-                          theta=-theta(rotateto),
-                          psi=-phi(rotateto),
+                          theta=-theta(rotate_to),
+                          psi=-phi(rotate_to),
                           verbose=verbose)
 
 
-def _SampledDirection(N, loc, scale, dist, verbose=0):
+def _sampled_direction(N, loc, scale, dist, verbose=0):
     """
     Generate N beams with profile given by the distribution with
     known scale and loc parameters
     """
 
-    Theta = dist(loc=loc, scale=scale).rvs(N)  # sampled theta
-    Phi = random.uniform(-1, 1, N) * pi  # uniform phi
+    theta = dist(loc=loc, scale=scale).rvs(N)  # sampled theta
+    phi = random.uniform(-1, 1, N) * pi  # uniform phi
 
     if verbose > 0:
-        print("Theta is", Theta / Degrees)
-        print("Phi is", Phi / Degrees)
+        print("Theta is", theta / Degrees)
+        print("Phi is", phi / Degrees)
 
-    X = sin(Theta) * cos(Phi)
-    Y = sin(Theta) * sin(Phi)
-    Z = cos(Theta)
+    x = sin(theta) * cos(phi)
+    y = sin(theta) * sin(phi)
+    z = cos(theta)
 
-    newvectors = dstack((X, Y, Z))[0, ...]
+    newvectors = dstack((x, y, z))[0, ...]
 
     if verbose > 0:
-        print("Shape of each is", shape(X), shape(Y), shape(Z))
+        print("Shape of each is", shape(x), shape(y), shape(z))
         print("Shape of newvectors is", shape(newvectors))
 
     return newvectors
 
 
-def SpecularReflection(olddirection, surfacenormal, ndots, verbose=0):
+def specular_reflection(old_direction, surface_normal, ndots):
     """
     Specular (mirror-like) Reflection
     """
     try:
-        newdirection = olddirection - 2 * ndots[:, newaxis] * surfacenormal
+        new_direction = old_direction - 2 * ndots[:, newaxis] * surface_normal
     except IndexError:
-        newdirection = olddirection - 2 * ndots * surfacenormal
+        new_direction = old_direction - 2 * ndots * surface_normal
 
-    return newdirection
+    return new_direction
 
 
-def LobeReflection(N, olddirection, surfacenormal, scale=1.3 * Degrees, **kwargs):
+def lobe_reflection(N, old_direction, surface_normal, **kwargs):
     """
     Deviation from specular reflection by a chosen amount (defaults to normal)
 
@@ -139,125 +135,118 @@ def LobeReflection(N, olddirection, surfacenormal, scale=1.3 * Degrees, **kwargs
     verbose : verbosity control
     """
 
-    dist = kwargs.get("dist", lambda n, scale: scale * random.randn(N))  #defaults to random normal distribution
+    dist = kwargs.get("dist", lambda n, scale: scale * random.randn(N))  # defaults to random normal distribution
+    scale = kwargs.get("scale", 1.3 * Degrees)
     verbose = kwargs.get("verbose", 0)
 
-    outgoing_vector = SpecularReflection(olddirection, surfacenormal, dot(olddirection, surfacenormal), verbose)
+    outgoing_vector = specular_reflection(old_direction, surface_normal, dot(old_direction, surface_normal), verbose)
 
     if verbose > 0:
-        expected_angle = arccos(dot(outgoing_vector, surfacenormal))
-        print("Expected angle with surface normal is {0} degrees".format(expected_angle/Degrees))
+        expected_angle = arccos(dot(outgoing_vector, surface_normal))
+        print("Expected angle with surface normal is {0} degrees".format(expected_angle / Degrees))
 
-    t2 = cross(outgoing_vector, olddirection)  #perpendicular to plane
-    t3 = cross(t2, outgoing_vector)  #parallel to plane
+    t2 = cross(outgoing_vector, old_direction)  # perpendicular to plane
+    t3 = cross(t2, outgoing_vector)  # parallel to plane
 
     amplitudes = dist(N, scale)
     random_numbers = random.rand(N)[..., newaxis]
 
-    A = 1/ sqrt(1 + amplitudes ** 2)[..., newaxis]
+    A = 1 / sqrt(1 + amplitudes ** 2)[..., newaxis]
 
-    deviation_vector = A * (outgoing_vector + amplitudes[..., newaxis]*(t2*random_numbers + t3*sqrt(1-random_numbers**2)))
-
-    #deviation_vector = 1 / sqrt(1 + amplitudes ** 2)[..., newaxis] * add(outgoing_vector,
-    #                                                         [anamplitude * (U * t2 + sqrt(1 - U ** 2) * t3) for
-    #                                                          U, anamplitude in zip(random.rand(N), amplitudes)])
+    deviation_vector = A * (outgoing_vector + amplitudes[..., newaxis] * (t2 * random_numbers + t3 * sqrt(1 - random_numbers ** 2)))
 
     return deviation_vector
 
-def LambertianReflection(N=1, surfacenormal=array([0, 0, 1]), verbose=0):
+
+def lambertian_reflection(N=1, surface_normal=array([0, 0, 1]), verbose=0):
     """
     Gives Lambertian distribution
 
     orients to surface normal
     """
 
-    class thetadist:
+    class ThetaDist:
         def __init__(self, loc, scale):
             pass
 
-        def rvs(self, N):
+        @staticmethod
+        def rvs(N):
             return arcsin(random.uniform(0, 1, N))
 
-    adirection = _SampledDirection(N, loc=0, scale=0, dist=thetadist,
+    new_direction = _sampled_direction(N, loc=0, scale=0, dist=ThetaDist,
                                    verbose=verbose)
 
     # rotate to -ve of surface normal --> photons orient into the bloody box
-    return RotateVectors(adirection, -surfacenormal, verbose)
+    return rotate_vectors(new_direction, -surface_normal, verbose)
 
 
-def IsotropicReflection(N=1, surfacenormal=array([0, 0, 1]), verbose=0):
+def isotropic_reflection(N=1, surface_normal=array([0, 0, 1]), verbose=0):
     """
     no preferred direction hemispherical emission
 
     orients to surface normal
     """
-    adirection = _RandomPointsOnASphere(N, hemisphere=True)
+    new_direction = _random_points_on_a_sphere(N, hemisphere=True)
 
-    return RotateVectors(adirection, -surfacenormal, verbose)
+    return rotate_vectors(new_direction, -surface_normal, verbose)
 
 
-def IsotropicSegmentReflection(N=1, surfacenormal=array([0, 0, 1]), mat=None,
+def theta_segment_reflection(N=1, surface_normal=array([0, 0, 1]), mat=None,
                                fetchall=False, verbose=0):
     """
     Returns N directions from sphere point picking (Marsaglia 1972)
     """
 
     while True:
-        ListOfDirections = GenerateIsotropicList(N)
+        potential_directions = generate_isotropic_source(N)
 
-        mincondition = ListOfDirections[..., 2] < cos(mat.mintheta)
-        maxcondition = ListOfDirections[..., 2] > cos(mat.maxtheta)
+        min_theta_bool = potential_directions[..., 2] < cos(mat.mintheta)
+        max_theta_bool = potential_directions[..., 2] > cos(mat.maxtheta)
 
         try:  # matching directions aren't wasted when we generate more
-            AllowedDirections = vstack((AllowedDirections,
-                                        ListOfDirections[mincondition & maxcondition]))
+            new_directions = vstack((new_directions, potential_directions[min_theta_bool & max_theta_bool]))
         except UnboundLocalError:
-            AllowedDirections = ListOfDirections[mincondition & maxcondition]
+            new_directions = potential_directions[min_theta_bool & max_theta_bool]
 
         if verbose > 0:
-            print("Additional matching is", sum(mincondition & maxcondition))
-            print("Total is now", len(AllowedDirections))
-            print("Shape of AllowDirections is", shape(AllowedDirections))
+            print("Additional matching is", sum(min_theta_bool & max_theta_bool))
+            print("Total is now", len(new_directions))
+            print("Shape of AllowDirections is", shape(new_directions))
 
-        if len(AllowedDirections) < N:
+        if len(new_directions) < N:
             continue
 
         if fetchall:
-            return RotateVectors(AllowedDirections, -surfacenormal, verbose)
-        else:
+            return rotate_vectors(new_directions, -surface_normal, verbose)
+        else:   # returns 'N' valid new directions only
             try:
-                indices = random.choice(range(len(AllowedDirections)), N)
+                indices = random.choice(range(len(new_directions)), N)
             except AttributeError:
-                indices = random_integers(len(AllowedDirections), N)
-            return (
-                RotateVectors(
-                    AllowedDirections[indices],
-                    -surfacenormal,
-                    verbose)
-            )
+                indices = random_integers(len(new_directions), N)
+            return rotate_vectors(new_directions[indices], -surface_normal, verbose)
 
 
-def DirectionVector(theta=0 * Degrees, phi=0 * Degrees, amplitude=1, verbose=0):
-    """
-    Spherical coordinates (r,theta,phi) --> cartesian coordinates (x,y,z)
-    """
-    if issubdtype(type(theta), float) and issubdtype(type(phi), float):
-        return (
-            array([sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta)])
-        )
-
-    x = amplitude * sin(theta) * cos(phi)
-    y = amplitude * sin(theta) * sin(phi)
-    if issubdtype(type(theta), float):
-        z = amplitude * cos(theta) * ones(shape(x))
-    else:
-        z = amplitude * cos(theta)
-    if verbose > 0:
-        print("x", x)
-        print("y", y)
-        print("z", z)
-
-    return dstack([x, y, z])
+# def DirectionVector(theta=0 * Degrees, phi=0 * Degrees, amplitude=1, verbose=0):
+#     """
+#     Spherical coordinates (r,theta,phi) --> cartesian coordinates (x,y,z)
+#     """
+#     if issubdtype(type(theta), float) and issubdtype(type(phi), float):
+#         return (
+#             array([sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta)])
+#         )
+#
+#     x = amplitude * sin(theta) * cos(phi)
+#     y = amplitude * sin(theta) * sin(phi)
+#     if issubdtype(type(theta), float):
+#         z = amplitude * cos(theta) * ones(shape(x))
+#     else:
+#         z = amplitude * cos(theta)
+#     if verbose > 0:
+#         print("x", x)
+#         print("y", y)
+#         print("z", z)
+#
+#     return dstack([x, y, z])
 
 
 def spherical_unit_vectors(theta=0, phi=0):
@@ -277,7 +266,7 @@ def spherical_unit_vectors(theta=0, phi=0):
     return r, th, ph
 
 
-def radial_direction_vector(theta=0, phi=0, amplitude=1, verbose=0):
+def radial_direction_vector(theta=0, phi=0, amplitude=1):
     """
     returns r unit vector in cartesian coordinates
     """
@@ -287,7 +276,7 @@ def radial_direction_vector(theta=0, phi=0, amplitude=1, verbose=0):
                   amplitude * ones(shape(phi)) * cos(theta))).T
 
 
-def _RandomPointsOnASphere(N, hemisphere=False, split=False):
+def _random_points_on_a_sphere(N, hemisphere=False):
     """
     Generates random points on a sphere
     or on a hemisphere (default is sphere)
@@ -315,40 +304,39 @@ def _RandomPointsOnASphere(N, hemisphere=False, split=False):
     return dstack((x, y, z))[0, ...]
 
 
-def GenerateIsotropicList(N):
-    return _RandomPointsOnASphere(N, hemisphere=False)
+def generate_isotropic_source(N):
+    return _random_points_on_a_sphere(N, hemisphere=False)
 
 
-def IsotropicSource(N, Pos=(0, 0, 0)):
-    """
-    Returns a list of initial photons of size N
-    direction, position, times
-    """
-    return _RandomPointsOnASphere(N), array(list([Pos]) * N), zeros(N)
+# def IsotropicSource(N, Pos=(0, 0, 0)):
+#     """
+#     Returns a list of initial photons of size N
+#     direction, position, times
+#     """
+#     return _random_points_on_a_sphere(N), array(list([Pos]) * N), zeros(N)
 
 
-def TestSource(Pos, aBox):
-    return aBox.normals, array(list([Pos]) * 6), zeros(6)
+# def TestSource(Pos, aBox):
+#     return aBox.normals, array(list([Pos]) * 6), zeros(6)
 
 
-def vectorsnell(Directions, faces, aBox, verbose=0):
+def snell_vectorised(Directions, faces, aBox, verbose=0):
     """
     Vectorised Snell Operation
     """
     NewDirections = ones(shape(Directions))
-    for uniqueface in set(faces):  #groupby surfacenormal
-        surfacenormal = aBox.normals[uniqueface]*-1
+    for uniqueface in set(faces):  # groupby surfacenormal
+        surface_normal = aBox.normals[uniqueface] * -1
         Condition = (faces == uniqueface)
 
         if not any(Condition):
             continue
 
-
         ratio_of_indices = aBox.n / aBox.mat[uniqueface].n
-        direction_dot_surfacenormal = dot(Directions[Condition], surfacenormal)
+        direction_dot_surfacenormal = dot(Directions[Condition], surface_normal)
         nds = sqrt(1 - ratio_of_indices ** 2 * (1 - direction_dot_surfacenormal ** 2))
 
-        NewDirections[Condition] = ratio_of_indices * (Directions[Condition] - direction_dot_surfacenormal[..., newaxis] * surfacenormal) + nds[..., newaxis] * surfacenormal
+        NewDirections[Condition] = ratio_of_indices * (Directions[Condition] - direction_dot_surfacenormal[..., newaxis] * surface_normal) + nds[..., newaxis] * surface_normal
 
         if verbose > 0:
             print(shape(Directions), shape(NewDirections))
@@ -358,7 +346,7 @@ def vectorsnell(Directions, faces, aBox, verbose=0):
     return NewDirections
 
 
-def NearestFace(Directions, Positions, aBox, verbose=0, threshold=1e-15):
+def nearest_face(Directions, Positions, aBox, verbose=0, threshold=1e-15):
     """
     returns the distance to the nearest face, the nearest face index and
     the angle with respect to the surface normal
@@ -390,7 +378,7 @@ def NearestFace(Directions, Positions, aBox, verbose=0, threshold=1e-15):
     return Faces, DistanceTo, nds
 
 
-def EscapeStatus(faces, ndots, aBox, reflectivity=True, fresnel=True, surface_layer='inner', verbose=0):
+def face_escape_status(faces, ndots, aBox, reflectivity=True, fresnel=True, surface_layer='inner', verbose=0):
     """
     Photons arriving at a surface will change status to 'trapped','escaped'
     or 'absorbed' based on order of events
@@ -401,7 +389,7 @@ def EscapeStatus(faces, ndots, aBox, reflectivity=True, fresnel=True, surface_la
 
     CritAngles = zeros(shape(faces))
     for uniqueface in set(faces):
-        CritAngles[faces == uniqueface] = aBox.Crit(uniqueface)
+        CritAngles[faces == uniqueface] = aBox.get_critical_angle(uniqueface)
 
     angles = array([arccos(aval) for aval in ndots])
     escape_status = angles < CritAngles  # Incident angle less than critical angle?
@@ -411,7 +399,7 @@ def EscapeStatus(faces, ndots, aBox, reflectivity=True, fresnel=True, surface_la
         print("Escaping", sum(escape_status))
 
     if fresnel:
-        Fresnel = aBox.Fresnel(faces, angles)
+        Fresnel = aBox.fresnel_reflectance(faces, angles)
         ru = random.uniform(size=len(faces))
         escape_status &= (Fresnel < ru)  # Reflection coefficient less than
 
@@ -422,7 +410,7 @@ def EscapeStatus(faces, ndots, aBox, reflectivity=True, fresnel=True, surface_la
     if reflectivity:
         Reflectivities = zeros(shape(faces))
         for uniqueface in set(faces):
-            Reflectivities[faces == uniqueface] = aBox.Ref(uniqueface, surface_layer)
+            Reflectivities[faces == uniqueface] = aBox.get_reflectivity(uniqueface, surface_layer)
 
         ru = random.uniform(size=len(faces))
         escape_status &= (Reflectivities < ru)
@@ -438,7 +426,7 @@ def EscapeStatus(faces, ndots, aBox, reflectivity=True, fresnel=True, surface_la
     return escape_status  # if true, photon escapes
 
 
-def _firsttrue(param):
+def _first_true(param):
     """
     Returns index of first true in sequential bool array
     """
@@ -447,7 +435,7 @@ def _firsttrue(param):
             return j
 
 
-def _getnewdirection(key, olddirection, ndots, surfacenormal, mat, verbose=0):
+def _get_new_direction(key, old_direction, ndots, surface_normal, mat, verbose=0):
     """
     Returns newdirection based reflection model chosen by _key_
 
@@ -458,20 +446,20 @@ def _getnewdirection(key, olddirection, ndots, surfacenormal, mat, verbose=0):
         print("{0} corresponds to {1} reflection".format(key, reflection[key]))
 
     if key == 0:  # specular
-        return SpecularReflection(olddirection, surfacenormal, ndots, verbose=verbose)
+        return specular_reflection(old_direction, surface_normal, ndots, verbose=verbose)
     elif key == 1:  # lobe
-        return LobeReflection(len(olddirection), olddirection, surfacenormal, scale=mat.lobeangle, verbose=verbose)
+        return lobe_reflection(len(old_direction), old_direction, surface_normal, scale=mat.lobeangle, verbose=verbose)
     elif key == 2:  # backscatter
-        return -1 * olddirection
+        return -1 * old_direction
     elif key == 3:  # lambertian
-        return LambertianReflection(len(ndots), surfacenormal)
+        return lambertian_reflection(len(ndots), surface_normal)
     elif key == 4:  # confined hemisphere
-        return IsotropicSegmentReflection(len(ndots), surfacenormal, mat)
+        return theta_segment_reflection(len(ndots), surface_normal, mat)
     else:
         raise NotImplementedError("Unknown Reflection type!")
 
 
-def UpdateSpecularDirection(olddirection, faces, ndots, aBox, verbose=0):
+def update_direction_specularonly(olddirection, faces, ndots, aBox, verbose=0):
     """
     Updates directions using the specular model only
     """
@@ -484,7 +472,7 @@ def UpdateSpecularDirection(olddirection, faces, ndots, aBox, verbose=0):
         if not any(Condition):
             continue
 
-        newdirection[Condition, ...] = _getnewdirection(
+        newdirection[Condition, ...] = _get_new_direction(
             0, olddirection[Condition, ...],
             ndots[Condition, ...],
             surfacenormal, aBox.mat[uniqueface], verbose=verbose)
@@ -492,25 +480,26 @@ def UpdateSpecularDirection(olddirection, faces, ndots, aBox, verbose=0):
     return newdirection
 
 
-def UpdateDirection(olddirection, faces, ndots, aBox, surface_layer='inner', verbose=0):
+def update_direction(old_direction, faces, ndots, aBox, surface_layer='inner', verbose=0):
     """
     Calculates new direction for a given photon at a given face for a set
     of UNIFIED parameters
     """
 
-    unifiedparameters = zeros((len(faces), 5))
+    unifiedparameters = zeros((len(faces), 5))  #  TODO replace 5 with number fetched from aBox.mat class
 
     if verbose > 0:
-        print("The unified parameters for the {} surface are {}".format(surface_layer, aBox.GetUnified(0, surface_layer)))
+        print(
+            "The unified parameters for the {} surface are {}".format(surface_layer, aBox.get_surface_parameters(0, surface_layer)))
 
     for uniqueface in set(faces):
         Condition = (faces == uniqueface)
-        unifiedparameters[Condition] = aBox.GetUnified(uniqueface, surface_layer)
+        unifiedparameters[Condition] = aBox.get_surface_parameters(uniqueface, surface_layer)
 
-    whichreflection = array([_firsttrue(ru < up) for (ru, up)
+    whichreflection = array([_first_true(ru < up) for (ru, up)
                              in zip(random.uniform(size=len(faces)), unifiedparameters)])
 
-    newdirection = zeros(shape(olddirection))  # newdirection
+    newdirection = zeros(shape(old_direction))  # newdirection
 
     for uniqueface in set(faces):
         surfacenormal = aBox.normals[uniqueface]
@@ -522,50 +511,49 @@ def UpdateDirection(olddirection, faces, ndots, aBox, surface_layer='inner', ver
             if not any(Condition):
                 continue
 
-            newdirection[Condition, ...] = _getnewdirection(
-                aref, olddirection[Condition, ...],
+            newdirection[Condition, ...] = _get_new_direction(
+                aref, old_direction[Condition, ...],
                 ndots[Condition, ...],
                 surfacenormal, aBox.mat[uniqueface], verbose=verbose)
 
     if verbose > 1:
         print("--Update Direction--")
-        for od, nd in zip(olddirection, newdirection):
+        for od, nd in zip(old_direction, newdirection):
             print("Old direction :", od)
             print("New direction : ", nd)
 
     return newdirection
 
 
-def UpdatePosition(oldposition, distanceto,
-                   oldtime, directions, aBox, verbose=0):
+def update_position(old_position, distanceto, old_time, directions, aBox, verbose=0):
     """
     Moves photons to new position
     """
 
-    newposition = oldposition + distanceto[:, newaxis] * directions
-    newtime = oldtime + aBox.n * distanceto / SpeedOfLight
+    new_position = old_position + distanceto[:, newaxis] * directions
+    new_time = old_time + aBox.n * distanceto / SpeedOfLight
 
     if verbose > 1:
         print("--Update Position--")
-        for np, ot, nt in zip(newposition, oldtime, newtime):
+        for np, ot, nt in zip(new_position, old_time, new_time):
             #print("New position : ", np)
             print("prior time was : ", ot / ps, "ps")
             print("Updated time : ", nt / ps, "ps")
 
-    return newposition, newtime
+    return new_position, new_time
 
 
-def ToDataFrame(directions, positions, times, faces):
-    adict = [{"xpos": float(xpos), "ypos": float(ypos), "zpos": float(zpos),
-              "xdir": float(xdir), "ydir": float(ydir), "zdir": float(zdir),
-              "face": fc, "time": atime}
-             for (xpos, ypos, zpos), (xdir, ydir, zdir), fc, atime in
-             zip(positions, directions, faces, times)]
+# def ToDataFrame(directions, positions, times, faces):
+#     adict = [{"xpos": float(xpos), "ypos": float(ypos), "zpos": float(zpos),
+#               "xdir": float(xdir), "ydir": float(ydir), "zdir": float(zdir),
+#               "face": fc, "time": atime}
+#              for (xpos, ypos, zpos), (xdir, ydir, zdir), fc, atime in
+#              zip(positions, directions, faces, times)]
+#
+#     return DataFrame(adict)
 
-    return DataFrame(adict)
 
-
-def LightinaBox(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
+def run(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
     """
     Given known initial conditions we propagate photons through the chosen
     geometry
@@ -595,23 +583,23 @@ def LightinaBox(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
         if verbose > 1:
             print("Onto {} run".format(runnum))
 
-        faces, distanceto, ndots = NearestFace(directions, positions,
+        faces, distanceto, ndots = nearest_face(directions, positions,
                                                aBox, verbose=verbose)
 
-        positions, times = UpdatePosition(positions, distanceto, times,
+        positions, times = update_position(positions, distanceto, times,
                                           directions, aBox, verbose=verbose)
 
         #escape status for a polished uncoated surface --> 
         #aBox.reflectivity is dealt with in the secondary escape status
-        escaped_inner = EscapeStatus(faces, ndots, aBox, fresnel=fresnel,
+        escaped_inner = face_escape_status(faces, ndots, aBox, fresnel=fresnel,
                                      reflectivity=False, verbose=verbose)
 
         #only update directions of not escaping photons
 
         if specular_only:
-            direction_func = UpdateSpecularDirection
+            direction_func = update_direction_specularonly
         else:
-            direction_func = UpdateDirection
+            direction_func = update_direction
 
         reflected_from_inner = invert(escaped_inner)
 
@@ -621,7 +609,7 @@ def LightinaBox(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
                                                                aBox, verbose=verbose)
 
         if hasattr(aBox, 'outer_materials'):
-            escaped_outer = EscapeStatus(faces,
+            escaped_outer = face_escape_status(faces,
                                          ndots,
                                          aBox, fresnel=False,
                                          reflectivity=reflectivity,
@@ -634,21 +622,22 @@ def LightinaBox(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
             assert not any(reflected_from_outer & reflected_from_inner), "inconsistent definition of reflections"
 
             if verbose > 0:
-                print("{} photons reach the outer surface with {} escaping leading to {} reflected".format(sum(escaped_inner),
-                                                                                                           sum(escaped),
-                                                                                                           sum(reflected_from_outer)))
+                print("{} photons reach the outer surface with {} escaping leading to {} reflected".format(
+                    sum(escaped_inner),
+                    sum(escaped),
+                    sum(reflected_from_outer)))
 
             if any(reflected_from_outer):  # update direction of trapped photons from outer surface
                 #Photons STILL not escaping gain a new direction!
-                directions[reflected_from_outer, ...] = UpdateDirection(directions[reflected_from_outer, ...],
-                                                                                faces[reflected_from_outer, ...],
-                                                                                ndots[reflected_from_outer, ...],
-                                                                                aBox, surface_layer='outer',
-                                                                                verbose=verbose)
+                directions[reflected_from_outer, ...] = update_direction(directions[reflected_from_outer, ...],
+                                                                        faces[reflected_from_outer, ...],
+                                                                        ndots[reflected_from_outer, ...],
+                                                                        aBox, surface_layer='outer',
+                                                                        verbose=verbose)
 
                 ## Bend photons back towards the centre
                 if enable_snell:
-                    directions[reflected_from_outer, ...] = vectorsnell(directions[reflected_from_outer, ...],
+                    directions[reflected_from_outer, ...] = snell_vectorised(directions[reflected_from_outer, ...],
                                                                         faces[reflected_from_outer, ...],
                                                                         aBox, verbose=verbose)
 
@@ -670,9 +659,9 @@ def LightinaBox(idir, ipos, itime, aBox, runs=1, verbose=0, **kwargs):
             for (xpos, ypos, zpos), (xdir, ydir, zdir), fc, atime, nds in
             zip(positions[escaped], directions[escaped], faces[escaped], times[escaped], ndots[escaped])]
 
-        directions = directions[escaped == False]
-        positions = positions[escaped == False]
-        times = times[escaped == False]
+        directions = directions[escaped is False]
+        positions = positions[escaped is False]
+        times = times[escaped is False]
 
         if nothingescaped > maxrepeat:
             if verbose > 0:

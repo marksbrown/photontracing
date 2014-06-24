@@ -10,9 +10,11 @@ in geometries defined below. Several examples are given in this file.
 """
 
 from __future__ import print_function, division
+from itertools import combinations
+
 from numpy import arcsin, sin, dot, subtract, linalg, cos, isnan
 from numpy import tan, zeros, shape
-from itertools import combinations
+
 from .generic import *
 
 
@@ -49,7 +51,7 @@ class Box():  # Box Properties
     def __repr__(self):
         return self.name
 
-    def GetUnified(self, face, surface_layer='inner'):
+    def get_surface_parameters(self, face, surface_layer='inner'):
         """
         Retrieves unified parameters for a chosen face of form
         [specular,lobe,backscatter,lambertian]
@@ -60,7 +62,7 @@ class Box():  # Box Properties
         elif surface_layer == 'outer':
             return self.outer_materials[face].surface
 
-    def Crit(self, face, surface_layer='inner'):
+    def get_critical_angle(self, face, surface_layer='inner'):
         """
         Returns the critical angle at facet
         """
@@ -69,17 +71,17 @@ class Box():  # Box Properties
         elif surface_layer == 'outer':
             return arcsin(self.outer_materials[face].n / self.mat[face].n)
 
-    def Ref(self, face, surface_layer='inner'):
+    def get_reflectivity(self, face, surface_layer='inner'):
 
         if surface_layer == 'inner':
             return self.mat[face].reflectivity
         elif surface_layer == 'outer':
             return self.outer_materials[face].reflectivity
 
-    def SurfaceNormal(self, face):
+    def get_surface_normal(self, face):
         return self.normals[face]
 
-    def Fresnel(self, faces, i):
+    def fresnel_reflectance(self, faces, i):
         """
         Returns Fresnel reflectance for each face
 
@@ -101,12 +103,12 @@ class Box():  # Box Properties
 
         rTE[isnan(rTE)] = 1
         rTM[isnan(rTM)] = 1
-        rTE[n1==n2] = 0
-        rTM[n1==n2] = 0
+        rTE[n1 == n2] = 0
+        rTM[n1 == n2] = 0
 
         return 0.5 * (rTE ** 2 + rTM ** 2)
 
-    def PlotFrame(self, axis, threshold=1e-15, offset=(0, 0, 0), verbose=0):
+    def plot_frame(self, axis, threshold=1e-15, offset=(0, 0, 0), verbose=0):
         """
         plots a 3D wireframe of the box defined by the vertices and surface normals given
         Threshold : instead of ==0 we use < Threshold to allow for inaccuracies
@@ -140,7 +142,7 @@ class Box():  # Box Properties
         labelaxes(axis)
 
 
-def TwoFacesBox(L, rindex, materials, **kwargs):
+def two_infinite_faces(L, rindex, materials, **kwargs):
     """
     Two Infinite Faces separated by a distance L
     """
@@ -155,7 +157,7 @@ def TwoFacesBox(L, rindex, materials, **kwargs):
     )
 
 
-def RegularCuboidBox(LX, LY, LZ, rindex, materials, **kwargs):
+def regular_cuboid(LX, LY, LZ, rindex, materials, **kwargs):
     """
     Creates regular cuboid
     LX,LY,LZ : lengths of x,y,z
@@ -179,7 +181,7 @@ def RegularCuboidBox(LX, LY, LZ, rindex, materials, **kwargs):
     )
 
 
-def RaisedTopBox(LX, LY, LZ, ThetaX, rindex, materials, **kwargs):
+def raised_top_cuboid(LX, LY, LZ, ThetaX, rindex, materials, **kwargs):
     """
     Creates box with raised top edge
     LX,LY,LZ : lengths of x,y,z
@@ -205,7 +207,7 @@ def RaisedTopBox(LX, LY, LZ, ThetaX, rindex, materials, **kwargs):
     )
 
 
-def TrapeziumBox(LX, LY, LZ, ThetaX, ThetaY, rindex, materials, **kwargs):
+def trapezium_cuboid(LX, LY, LZ, ThetaX, ThetaY, rindex, materials, **kwargs):
     """
     Creates irregular trapezium
     LX,LY,LZ : lengths of x,y,z
