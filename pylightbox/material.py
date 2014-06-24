@@ -44,7 +44,7 @@ class Surface():
 
 #defaults to 6 sided box
 def OneMaterial(materialA, faces=range(6)):
-    return {fa: materialA for fa in facesA}
+    return {fa: materialA for fa in faces}
 
 
 def TwoMaterials(materialA, materialB, facesA=([5]), facesB=range(5)):
