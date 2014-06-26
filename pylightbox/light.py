@@ -610,11 +610,16 @@ class PhotonTrace():
         self.faces = zeros(num_of_photons)
         self.ndots = zeros(num_of_photons)
         self.photon_status = ones(num_of_photons, dtype=bool)  # 1 corresponds to trapped, 0 to escaped
+        self.energy = kwargs.get('energy', ones(num_of_photons)/num_of_photons)
+        self.photons_escaped_last = 0
+        #df.time /= ps
 
 
     def describe_data(self):
         """
         print output describing the system
+        times in ps
+
         """
 
         out_string = """
@@ -633,13 +638,25 @@ class PhotonTrace():
 
         return [{'xpos': apos[0], 'ypos': apos[1], 'zpos': apos[2],
                 'xdir': adir[0],  'ydir': adir[1], 'zdir': adir[2],
-                'time': atime,    'face': face,    'angle': angle,
-                'photonstatus' : status} for apos, adir, atime, face, angle, status in zip(self.positions,
+                'time': atime,    'face': face,    'angle': angle, 'energy': energy,
+                'photonstatus': status} for apos, adir, atime, face, angle, energy, status in zip(self.positions,
                                                                                       self.directions,
-                                                                                      self.times,
+                                                                                      self.times/ps,
                                                                                       self.faces,
                                                                                       arccos(self.ndots),
+                                                                                      self.energy,
                                                                                       self.photon_status)]
+
+    def run_gen(self, runs=10, **kwargs):
+        """
+        Data is yielded every iteration allowing creation of animation
+        """
+        yield self.fetch_data()
+
+        for run_num in range(runs):
+            self.run()
+            yield self.fetch_data()
+
 
     def run(self, runs=1, **kwargs):
         """
@@ -669,25 +686,21 @@ class PhotonTrace():
 
 
 
-            if verbose > 0:
-                print("There are {} photons trapped at start of run {}".format(photons_trapped, run_num))
-
             self.directions[self.photon_status], self.positions[self.photon_status], \
             self.times[self.photon_status], self.ndots[self.photon_status], self.faces[self.photon_status], \
             escaped_photons = step(self.directions[self.photon_status], self.positions[self.photon_status],
                                                             self.times[self.photon_status], self.aBox, **kwargs)
 
 
+            ## Locations in lists where there is a change from trapped to escaped are described by the XOR below
+            self.photons_escaped_last = sum(self.photon_status[self.photon_status] ^ invert(escaped_photons))
+
+
             self.photon_status[self.photon_status] = invert(escaped_photons)
 
             #self.photon_status[escaped_photons]= False  # Escaped photons are no longer bothered
 
-            photons_trapped = sum(self.photon_status)  # True are trapped
-
-            if verbose > 0:
-                print("There are {} photons trapped at end of run {}".format(photons_trapped, run_num))
-
-            if sum(self.photon_status) == photons_trapped:  # No additional photons have escaped
+            if self.photons_escaped_last == 0:  # No additional photons have escaped
                 nothing_escaped_counter += 1
 
                 if nothing_escaped_counter > max_repeat:
