@@ -350,13 +350,13 @@ def face_escape_status(faces, ndots, aBox, reflectivity=True, fresnel=True, surf
     """
 
     CritAngles = zeros(shape(faces))
-    for uniqueface in set(faces):
-        CritAngles[faces == uniqueface] = aBox.get_critical_angle(uniqueface)
+    for unique_face in set(faces):
+        CritAngles[faces == unique_face] = aBox.get_critical_angle(unique_face)
 
     angles = array([arccos(aval) for aval in ndots])
     escape_status = angles < CritAngles  # Incident angle less than critical angle?
 
-    if verbose > 0:
+    if verbose > 1:
         print("--Critical--")
         print("Escaping", sum(escape_status))
 
@@ -365,25 +365,29 @@ def face_escape_status(faces, ndots, aBox, reflectivity=True, fresnel=True, surf
         ru = random.uniform(size=len(faces))
         escape_status &= (Fresnel < ru)  # Reflection coefficient less than
 
-        if verbose > 0:
+        if verbose > 1:
             print("--Fresnel--")
             print("Escaping", sum(escape_status))
 
     if reflectivity:
         Reflectivities = zeros(shape(faces))
-        for uniqueface in set(faces):
-            Reflectivities[faces == uniqueface] = aBox.get_reflectivity(uniqueface, surface_layer)
+        for unique_face in set(faces):
+            Reflectivities[faces == unique_face] = aBox.get_reflectivity(unique_face, surface_layer)
 
         ru = random.uniform(size=len(faces))
         escape_status &= (Reflectivities < ru)
 
-        if verbose > 0:
+        if verbose > 1:
             print("--Reflectivity--")
             print("Reflectivity : Escaped?")
             print("Escaping", sum(escape_status))
 
-    if verbose > 0:
-        print("{} photons incident with {} escaping".format(len(escape_status), sum(escape_status)))
+
+
+    for unique_face in set(faces):
+        if verbose > 0:
+            print("{} photons incident with {} escaping from face {}".format(
+                len(escape_status[faces == unique_face]), sum(escape_status[faces == unique_face]), unique_face))
 
     return escape_status  # if true, photon escapes
 
@@ -403,7 +407,7 @@ def _get_new_direction(key, old_direction, ndots, surface_normal, mat, verbose=0
 
     newdirections should be oriented correctly here
     """
-    if verbose > 0:
+    if verbose > 1:
         reflection = ['Specular', 'Lobe', 'Backscatter', 'Lambertian', 'Segment']
         print("{0} corresponds to {1} reflection".format(key, reflection[key]))
 
@@ -421,6 +425,27 @@ def _get_new_direction(key, old_direction, ndots, surface_normal, mat, verbose=0
         raise NotImplementedError("Unknown Reflection type!")
 
 
+def update_specular_direction(old_direction, faces, ndots, aBox, specular_only=True, verbose=0):
+    """
+    Updates directions using the specular model only
+    """
+
+    new_direction = zeros(shape(old_direction))  # newdirection
+
+    for uniqueface in set(faces):
+        surfacenormal = aBox.normals[uniqueface]
+        Condition = (faces == uniqueface)
+        if not any(Condition):
+            continue
+
+        new_direction[Condition, ...] = _get_new_direction(
+            0, old_direction[Condition, ...],
+            ndots[Condition, ...],
+            surfacenormal, aBox.mat[uniqueface], verbose=verbose)
+
+    return new_direction
+
+
 def update_direction(old_direction, faces, ndots, aBox, surface_layer='inner', specular_only=False, verbose=0):
     """
     Calculates new direction for a given photon at a given face for a set
@@ -430,7 +455,7 @@ def update_direction(old_direction, faces, ndots, aBox, surface_layer='inner', s
 
     unifiedparameters = zeros((len(faces), 5))  #  TODO replace 5 with number fetched from aBox.mat class
 
-    if verbose > 0:
+    if verbose > 1:
         print("The unified parameters for the {} surface are {}".format(surface_layer, aBox.get_surface_parameters(0, surface_layer)))
 
     for uniqueface in set(faces):
@@ -454,8 +479,6 @@ def update_direction(old_direction, faces, ndots, aBox, surface_layer='inner', s
             else:
                 Condition = (faces == uniqueface) & (which_reflection == aref)
 
-            if verbose > 0:
-                print("There are {} photons with {} reflection key out of {} at face {}".format(sum(Condition), aref, len(Condition), uniqueface))
             if not any(Condition):
                 continue
 
@@ -490,12 +513,87 @@ def update_position(old_position, distanceto, old_time, directions, aBox, verbos
 
     return new_position, new_time
 
+def step(directions, positions, times, aBox, **kwargs):
+    """
+    Move photons to next position
+    """
+    enable_snell = kwargs.get('enable_snell', True)
+    reflectivity_outer = kwargs.get('reflectivity_outer', True)
+    reflectivity_inner = kwargs.get('reflectivity_inner', True)
+    fresnel = kwargs.get('fresnel', True)
+    specular_only = kwargs.get('specularonly', False)
+    verbose = kwargs.get('verbose', 0)
+
+
+    faces, distanceto, ndots = nearest_face(directions, positions,
+                                            aBox, verbose=verbose)
+
+    positions, times = update_position(positions, distanceto, times,
+                                      directions, aBox, verbose=verbose)
+
+    #escape status for a polished uncoated surface -->
+    #aBox.reflectivity is dealt with in the secondary escape status
+    escaped_inner = face_escape_status(faces, ndots, aBox, fresnel=fresnel,
+                                 reflectivity=reflectivity_inner, verbose=verbose)
+
+    #only update directions of not escaping photons
+
+    reflected_from_inner = invert(escaped_inner)
+
+    directions[reflected_from_inner, ...] = update_direction(directions[reflected_from_inner, ...],
+                                                           faces[reflected_from_inner, ...],
+                                                           ndots[reflected_from_inner, ...],
+                                                           aBox,
+                                                           specular_only=specular_only,
+                                                           verbose=verbose)
+
+    if hasattr(aBox, 'outer_materials'):
+        escaped_outer = face_escape_status(faces,
+                                     ndots,
+                                     aBox, fresnel=False,
+                                     reflectivity=reflectivity_outer,
+                                     surface_layer='outer',
+                                     verbose=verbose)
+
+        escaped = escaped_outer & escaped_inner
+        reflected_from_outer = invert(escaped_outer) & escaped_inner
+
+        assert not any(reflected_from_outer & reflected_from_inner), "inconsistent definition of reflections"
+
+        if verbose > 0:
+            print("{} photons reach the outer surface with {} escaping leading to {} reflected".format(
+                sum(escaped_inner),
+                sum(escaped),
+                sum(reflected_from_outer)))
+
+        if any(reflected_from_outer):  # update direction of trapped photons from outer surface
+            #Photons STILL not escaping gain a new direction!
+            directions[reflected_from_outer, ...] = update_direction(directions[reflected_from_outer, ...],
+                                                                    faces[reflected_from_outer, ...],
+                                                                    ndots[reflected_from_outer, ...],
+                                                                    aBox, surface_layer='outer',
+                                                                    verbose=verbose)
+
+            ## Bend photons back towards the centre
+            if enable_snell:
+                directions[reflected_from_outer, ...] = snell_vectorised(directions[reflected_from_outer, ...],
+                                                                    faces[reflected_from_outer, ...],
+                                                                    aBox, verbose=verbose)
+
+    else:
+        escaped = escaped_inner
+
+    return directions, positions, times, ndots, faces, escaped
+
+
+
+
 
 class PhotonTrace():
     """
-
-
+    Creates a simulation that will run _num_of_photons_ within the _geometry_
     """
+
     def __init__(self, num_of_photons, geometry, **kwargs):
 
         if 'positions' in kwargs:
@@ -509,8 +607,41 @@ class PhotonTrace():
         self.times = kwargs.get('times', zeros(num_of_photons))  # defaults to zero for each photon
         self.aBox = geometry
 
+        self.faces = zeros(num_of_photons)
+        self.ndots = zeros(num_of_photons)
+        self.photon_status = ones(num_of_photons, dtype=bool)  # 1 corresponds to trapped, 0 to escaped
 
-    def run(self, runs=1, verbose=0, **kwargs):
+
+    def describe_data(self):
+        """
+        print output describing the system
+        """
+
+        out_string = """
+        Simulation holds {} photons of which {} have escaped. This corresponds to {:2.2f} % escaped
+        """
+
+        num_of_photons = len(self.photon_status)
+        num_of_escaped = sum(invert(self.photon_status))
+        print(out_string.format(num_of_photons, num_of_escaped, num_of_escaped/num_of_photons*1e2))
+
+
+    def fetch_data(self):
+        """
+        returns list of dictionaries of photons which have escaped
+        """
+
+        return [{'xpos': apos[0], 'ypos': apos[1], 'zpos': apos[2],
+                'xdir': adir[0],  'ydir': adir[1], 'zdir': adir[2],
+                'time': atime,    'face': face,    'angle': angle,
+                'photonstatus' : status} for apos, adir, atime, face, angle, status in zip(self.positions,
+                                                                                      self.directions,
+                                                                                      self.times,
+                                                                                      self.faces,
+                                                                                      arccos(self.ndots),
+                                                                                      self.photon_status)]
+
+    def run(self, runs=1, **kwargs):
         """
         Given known initial conditions we propagate photons through the chosen
         geometry
@@ -522,121 +653,45 @@ class PhotonTrace():
         runs : number of `bounces' to attempt
         """
 
-        enable_snell = kwargs.get('enable_snell', True)
-        reflectivity = kwargs.get('reflectivity', True)
-        fresnel = kwargs.get('fresnel', True)
-        maxrepeat = kwargs.get('maxrepeat', 10)
-        specular_only = kwargs.get('specularonly', False)
-        nothingescaped = 0
+        max_repeat = kwargs.get('maxrepeat', 10)
+        verbose = kwargs.get('verbose', 0)
 
-        ProcessedPhotons = []
+        nothing_escaped_counter = 0  # if above max_repeat the simulation is halted
 
-        ##initial setup
-        directions = self.directions
-        positions = self.positions
-        times = self.times
-        aBox = self.aBox
-
-        for runnum in range(runs):
-            if verbose > 1:
-                print("Onto {} run".format(runnum))
-
-            faces, distanceto, ndots = nearest_face(directions, positions,
-                                                   aBox, verbose=verbose)
-
-            positions, times = update_position(positions, distanceto, times,
-                                              directions, aBox, verbose=verbose)
-
-            #escape status for a polished uncoated surface -->
-            #aBox.reflectivity is dealt with in the secondary escape status
-            escaped_inner = face_escape_status(faces, ndots, aBox, fresnel=fresnel,
-                                         reflectivity=False, verbose=verbose)
-
-            #only update directions of not escaping photons
-
-            if specular_only:
-                direction_func = update_direction
-            else:
-                direction_func = update_direction
-
-            reflected_from_inner = invert(escaped_inner)
-
-            directions[reflected_from_inner, ...] = direction_func(directions[reflected_from_inner, ...],
-                                                                   faces[reflected_from_inner, ...],
-                                                                   ndots[reflected_from_inner, ...],
-                                                                   aBox,
-                                                                   specular_only=specular_only,
-                                                                   verbose=verbose)
-
-            if hasattr(aBox, 'outer_materials'):
-                escaped_outer = face_escape_status(faces,
-                                             ndots,
-                                             aBox, fresnel=False,
-                                             reflectivity=reflectivity,
-                                             surface_layer='outer',
-                                             verbose=verbose)
-
-                escaped = escaped_outer & escaped_inner
-                reflected_from_outer = invert(escaped_outer) & escaped_inner
-
-                assert not any(reflected_from_outer & reflected_from_inner), "inconsistent definition of reflections"
-
-                if verbose > 0:
-                    print("{} photons reach the outer surface with {} escaping leading to {} reflected".format(
-                        sum(escaped_inner),
-                        sum(escaped),
-                        sum(reflected_from_outer)))
-
-                if any(reflected_from_outer):  # update direction of trapped photons from outer surface
-                    #Photons STILL not escaping gain a new direction!
-                    directions[reflected_from_outer, ...] = update_direction(directions[reflected_from_outer, ...],
-                                                                            faces[reflected_from_outer, ...],
-                                                                            ndots[reflected_from_outer, ...],
-                                                                            aBox, surface_layer='outer',
-                                                                            verbose=verbose)
-
-                    ## Bend photons back towards the centre
-                    if enable_snell:
-                        directions[reflected_from_outer, ...] = snell_vectorised(directions[reflected_from_outer, ...],
-                                                                            faces[reflected_from_outer, ...],
-                                                                            aBox, verbose=verbose)
-
-            else:
-                escaped = escaped_inner
-
-            if not any(escaped):
-                nothingescaped += 1
+        for run_num in range(runs):
+            photons_trapped = sum(self.photon_status)  # True are trapped
 
             if verbose > 0:
-                print("--Photons Escaped--")
-                print(runnum, ": Escaped", sum(escaped))
-                print("\n\n")
+                print("\nOnto {} run with {} photons ({}/{})".format(run_num,
+                                                                     len(self.photon_status),
+                                                                     sum(self.photon_status),
+                                                                     sum(invert(self.photon_status))))
 
-            ProcessedPhotons += [
-                {"xpos": float(xpos), "ypos": float(ypos), "zpos": float(zpos),
-                 "xdir": float(xdir), "ydir": float(ydir), "zdir": float(zdir),
-                 "face": fc, "time": atime, "ndots": nds, "photonstatus": "Escaped"}
-                for (xpos, ypos, zpos), (xdir, ydir, zdir), fc, atime, nds in
-                zip(positions[escaped], directions[escaped], faces[escaped], times[escaped], ndots[escaped])]
 
-            directions = directions[escaped == False]
-            positions = positions[escaped == False]
-            times = times[escaped == False]
 
-            if nothingescaped > maxrepeat:
-                if verbose > 0:
-                    print(
-                        "No photons escaped in",
-                        maxrepeat,
-                        "runs, therefore giving up")
-                break
+            if verbose > 0:
+                print("There are {} photons trapped at start of run {}".format(photons_trapped, run_num))
 
-        # adds on all remaining 'trapped' photons
-        ProcessedPhotons += [
-            {"xpos": float(xpos), "ypos": float(ypos), "zpos": float(zpos),
-             "xdir": float(xdir), "ydir": float(ydir), "zdir": float(zdir),
-             "face": fc, "time": atime, "ndots": nds, "photonstatus": "Trapped"}
-            for (xpos, ypos, zpos), (xdir, ydir, zdir), fc, atime, nds in
-            zip(positions, directions, faces, times, ndots)]
+            self.directions[self.photon_status], self.positions[self.photon_status], \
+            self.times[self.photon_status], self.ndots[self.photon_status], self.faces[self.photon_status], \
+            escaped_photons = step(self.directions[self.photon_status], self.positions[self.photon_status],
+                                                            self.times[self.photon_status], self.aBox, **kwargs)
 
-        return ProcessedPhotons
+
+            self.photon_status[self.photon_status] = invert(escaped_photons)
+
+            #self.photon_status[escaped_photons]= False  # Escaped photons are no longer bothered
+
+            photons_trapped = sum(self.photon_status)  # True are trapped
+
+            if verbose > 0:
+                print("There are {} photons trapped at end of run {}".format(photons_trapped, run_num))
+
+            if sum(self.photon_status) == photons_trapped:  # No additional photons have escaped
+                nothing_escaped_counter += 1
+
+                if nothing_escaped_counter > max_repeat:
+                    print("Giving up on run {} after {} runs with no escape".format(run_num, max_repeat))
+                    break
+
+
