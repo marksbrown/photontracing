@@ -35,6 +35,10 @@ class Surface():
 
         self.mintheta = kwargs.get('mintheta', 0 * Degrees)
         self.maxtheta = kwargs.get('maxtheta', 90 * Degrees)
+
+        self.minphi = kwargs.get('minphi', None)
+        self.maxphi = kwargs.get('maxphi', None)
+
         assert self.mintheta >= 0, "Minimum theta is negative - not allowed!"
         assert self.maxtheta <= 90 * Degrees, "Maximum theta is > 90 - not allowed!"
 

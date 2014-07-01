@@ -221,6 +221,65 @@ def theta_segment_reflection(N=1, surface_normal=array([0, 0, 1]), mat=None,
             return rotate_vectors(new_directions[indices], -surface_normal, verbose)
 
 
+def theta_phi_segment_reflection(N, surface_normal=array([0, 0, 1]), mat=None, fetchall=False, verbose=0):
+    """
+    Returns N directions from sphere point picking within theta and phi ranges only
+    """
+    #theta=(0, pi/6), phi=None, verbose=0, max_iterations=100
+
+    if mat.maxphi is None:
+        if verbose > 0:
+            print("No phi range defined, skipping to default theta_segment_reflection")
+        return theta_segment_reflection(N, surface_normal, mat, fetchall, verbose)
+
+    min_theta = mat.mintheta
+    max_theta = mat.maxtheta
+
+    min_phi = mat.minphi
+    max_phi = mat.maxphi
+
+    while True:
+
+        potential_directions = generate_isotropic_source(N, 'all')
+
+        phi = arctan2(potential_directions[..., 1], potential_directions[..., 0])
+        phi[phi < 0] += 2*pi
+
+        min_phi_condition = phi > min_phi
+        max_phi_condition = phi < max_phi
+
+        min_theta_condition = potential_directions[..., 2] < cos(min_theta)
+        max_theta_condition = potential_directions[..., 2] > cos(max_theta)
+
+        min_condition = min_phi_condition & min_theta_condition
+        max_condition = max_phi_condition & max_theta_condition
+
+        try:  # matching directions aren't wasted when we generate more
+            new_directions = vstack((new_directions,
+                                        potential_directions[min_condition & max_condition]))
+        except UnboundLocalError:
+            new_directions = potential_directions[min_condition & max_condition]
+
+        if verbose > 0:
+            print("Additional matching is", sum(min_condition & max_condition))
+            print("Total is now", len(new_directions))
+            print("Shape of AllowDirections is", shape(new_directions))
+
+        if len(new_directions) < N:
+            continue
+
+        if fetchall:
+            return rotate_vectors(new_directions, -surface_normal, verbose)
+        else:   # returns 'N' valid new directions only
+            try:
+                indices = random.choice(range(len(new_directions)), N)
+            except AttributeError:
+                indices = random_integers(len(new_directions), N)
+            return rotate_vectors(new_directions[indices], -surface_normal, verbose)
+
+    return None
+
+
 def spherical_unit_vectors(theta=0, phi=0):
     """
     Spherical unit vectors as cartesian unit vectors
@@ -419,7 +478,7 @@ def _get_new_direction(key, old_direction, ndots, surface_normal, mat, verbose=0
     elif key == 3:  # lambertian
         return lambertian_reflection(len(ndots), surface_normal)
     elif key == 4:  # confined hemisphere
-        return theta_segment_reflection(len(ndots), surface_normal, mat)
+        return theta_phi_segment_reflection(len(ndots), surface_normal, mat)
     else:
         raise NotImplementedError("Unknown Reflection type!")
 
