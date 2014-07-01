@@ -1,6 +1,10 @@
 Photon Tracing
 ==============
 
+<a href="http://www.youtube.com/watch?feature=player_embedded&v=1KjX5eGRBPY
+" target="_blank"><img src="http://img.youtube.com/vi/1KjX5eGRBPY/0.jpg" 
+alt="Photons in a box" width="240" height="180" border="10" /></a>
+
 Description
 -----------
 Photon tracing is a Monte-Carlo simulation of photons within a closed geometry.
