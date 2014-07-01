@@ -1,0 +1,71 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+Box	pylightbox/box.py	/^class Box():  # Box Properties$/;"	c
+Degrees	pylightbox/const.py	/^Degrees = pi \/ 180$/;"	v
+OneMaterial	pylightbox/material.py	/^def OneMaterial(materialA, faces=range(6)):$/;"	f
+PhotonTrace	pylightbox/light.py	/^class PhotonTrace():$/;"	c
+SpeedOfLight	pylightbox/const.py	/^SpeedOfLight = 3E8$/;"	v
+Surface	pylightbox/material.py	/^class Surface():$/;"	c
+ThetaDist	pylightbox/light.py	/^    class ThetaDist:$/;"	c	function:lambertian_reflection
+ThreeMaterials	pylightbox/material.py	/^def ThreeMaterials(materialA, materialB, materialC, facesA=([5]), facesB=([3]), facesC=(0, 1, 2, 4)):$/;"	f
+TwoMaterials	pylightbox/material.py	/^def TwoMaterials(materialA, materialB, facesA=([5]), facesB=range(5)):$/;"	f
+__init__	pylightbox/box.py	/^    def __init__(self, n, cn, sn, sp, faces, materials, name="", **kwargs):$/;"	m	class:Box
+__init__	pylightbox/light.py	/^        def __init__(self, loc, scale):$/;"	m	class:lambertian_reflection.ThetaDist
+__init__	pylightbox/light.py	/^    def __init__(self, num_of_photons, geometry, **kwargs):$/;"	m	class:PhotonTrace
+__init__	pylightbox/material.py	/^    def __init__(self, n, ref=0, name="", **kwargs):$/;"	m	class:Surface
+__repr__	pylightbox/box.py	/^    def __repr__(self):$/;"	m	class:Box	file:
+__repr__	pylightbox/material.py	/^    def __repr__(self):$/;"	m	class:Surface	file:
+_first_true	pylightbox/light.py	/^def _first_true(param):$/;"	f
+_get_new_direction	pylightbox/light.py	/^def _get_new_direction(key, old_direction, ndots, surface_normal, mat, verbose=0):$/;"	f
+_random_points_on_a_sphere	pylightbox/light.py	/^def _random_points_on_a_sphere(N, hemisphere=False):$/;"	f
+_rotate_vector	pylightbox/light.py	/^def _rotate_vector(v, phi=0, theta=0, psi=0):$/;"	f
+_sampled_direction	pylightbox/light.py	/^def _sampled_direction(N, loc, scale, dist, verbose=0):$/;"	f
+_to_cube	pylightbox/generic.py	/^def _to_cube(axis, anum=1):$/;"	f
+cm	pylightbox/const.py	/^cm = 1e-2$/;"	v
+cross_python	pylightbox/light.py	/^def cross_python(u, v):$/;"	f
+describe_data	pylightbox/light.py	/^    def describe_data(self):$/;"	m	class:PhotonTrace
+dot_python	pylightbox/light.py	/^def dot_python(u, v):$/;"	f
+face_escape_status	pylightbox/light.py	/^def face_escape_status(faces, ndots, aBox, reflectivity=True, fresnel=True, surface_layer='inner', verbose=0):$/;"	f
+fetch_data	pylightbox/light.py	/^    def fetch_data(self):$/;"	m	class:PhotonTrace
+fetch_stats	pylightbox/light.py	/^    def fetch_stats(self):$/;"	m	class:PhotonTrace
+fresnel_reflectance	pylightbox/box.py	/^    def fresnel_reflectance(self, faces, i):$/;"	m	class:Box
+generate_isotropic_source	pylightbox/light.py	/^def generate_isotropic_source(N):$/;"	f
+get_critical_angle	pylightbox/box.py	/^    def get_critical_angle(self, face, surface_layer='inner'):$/;"	m	class:Box
+get_reflectivity	pylightbox/box.py	/^    def get_reflectivity(self, face, surface_layer='inner'):$/;"	m	class:Box
+get_surface_normal	pylightbox/box.py	/^    def get_surface_normal(self, face):$/;"	m	class:Box
+get_surface_parameters	pylightbox/box.py	/^    def get_surface_parameters(self, face, surface_layer='inner'):$/;"	m	class:Box
+isotropic_reflection	pylightbox/light.py	/^def isotropic_reflection(N=1, surface_normal=array([0, 0, 1]), verbose=0):$/;"	f
+labelaxes	pylightbox/generic.py	/^def labelaxes(axis, defaultunit=mm):$/;"	f
+lambertian_reflection	pylightbox/light.py	/^def lambertian_reflection(N=1, surface_normal=array([0, 0, 1]), verbose=0):$/;"	f
+lobe_reflection	pylightbox/light.py	/^def lobe_reflection(N, old_direction, surface_normal, **kwargs):$/;"	f
+mm	pylightbox/const.py	/^mm = 1e-3$/;"	v
+nearest_face	pylightbox/light.py	/^def nearest_face(Directions, Positions, aBox, verbose=0, threshold=1e-15):$/;"	f
+nm	pylightbox/const.py	/^nm = 1e-9$/;"	v
+ns	pylightbox/const.py	/^ns = 1e-9$/;"	v
+plot_angle	pylightbox/generic.py	/^def plot_angle(axis, df, **kwargs):$/;"	f
+plot_frame	pylightbox/box.py	/^    def plot_frame(self, axis, threshold=1e-15, offset=(0, 0, 0), verbose=0):$/;"	m	class:Box
+plot_time	pylightbox/generic.py	/^def plot_time(axis, df, **kwargs):$/;"	f
+ps	pylightbox/const.py	/^ps = 1e-12$/;"	v
+radial_direction_vector	pylightbox/light.py	/^def radial_direction_vector(theta=0, phi=0, amplitude=1):$/;"	f
+raised_top_cuboid	pylightbox/box.py	/^def raised_top_cuboid(LX, LY, LZ, ThetaX, rindex, materials, **kwargs):$/;"	f
+random_integers	pylightbox/light.py	/^def random_integers(m, n):$/;"	f
+regular_cuboid	pylightbox/box.py	/^def regular_cuboid(LX, LY, LZ, rindex, materials, **kwargs):$/;"	f
+rotate_vectors	pylightbox/light.py	/^def rotate_vectors(vectors, rotate_to=array([0, 0, 1]), verbose=0):$/;"	f
+run	pylightbox/light.py	/^    def run(self, runs=1, **kwargs):$/;"	m	class:PhotonTrace
+run_gen	pylightbox/light.py	/^    def run_gen(self, runs=10, **kwargs):$/;"	m	class:PhotonTrace
+rvs	pylightbox/light.py	/^        def rvs(N):$/;"	m	class:lambertian_reflection.ThetaDist
+save_figure	pylightbox/generic.py	/^def save_figure(name, loc, fig, file_extensions=('pdf', 'eps', 'png')):$/;"	f
+snell_vectorised	pylightbox/light.py	/^def snell_vectorised(Directions, faces, aBox, verbose=0):$/;"	f
+specular_reflection	pylightbox/light.py	/^def specular_reflection(old_direction, surface_normal, ndots):$/;"	f
+spherical_unit_vectors	pylightbox/light.py	/^def spherical_unit_vectors(theta=0, phi=0):$/;"	f
+step	pylightbox/light.py	/^def step(directions, positions, times, aBox, **kwargs):$/;"	f
+theta_segment_reflection	pylightbox/light.py	/^def theta_segment_reflection(N=1, surface_normal=array([0, 0, 1]), mat=None,$/;"	f
+trapezium_cuboid	pylightbox/box.py	/^def trapezium_cuboid(LX, LY, LZ, ThetaX, ThetaY, rindex, materials, **kwargs):$/;"	f
+two_infinite_faces	pylightbox/box.py	/^def two_infinite_faces(L, rindex, materials, **kwargs):$/;"	f
+update_direction	pylightbox/light.py	/^def update_direction(old_direction, faces, ndots, aBox, surface_layer='inner', specular_only=False, verbose=0):$/;"	f
+update_position	pylightbox/light.py	/^def update_position(old_position, distanceto, old_time, directions, aBox, verbose=0):$/;"	f
+update_specular_direction	pylightbox/light.py	/^def update_specular_direction(old_direction, faces, ndots, aBox, specular_only=True, verbose=0):$/;"	f
