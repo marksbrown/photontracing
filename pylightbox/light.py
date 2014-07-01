@@ -631,6 +631,9 @@ class PhotonTrace():
         print(out_string.format(num_of_photons, num_of_escaped, num_of_escaped/num_of_photons*1e2))
 
 
+    def fetch_stats(self):
+        return self.photons_escaped_last
+
     def fetch_data(self):
         """
         returns list of dictionaries of photons which have escaped
@@ -651,11 +654,14 @@ class PhotonTrace():
         """
         Data is yielded every iteration allowing creation of animation
         """
-        yield self.fetch_data()
+
+        fetch = kwargs.get('fetch', self.fetch_data)
+
+        yield fetch()
 
         for run_num in range(runs):
-            self.run()
-            yield self.fetch_data()
+            self.run(**kwargs)
+            yield fetch()
 
 
     def run(self, runs=1, **kwargs):
