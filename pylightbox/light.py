@@ -78,8 +78,7 @@ def rotate_vectors(vectors, rotate_to=array([0, 0, 1]), verbose=0):
     return _rotate_vector(vectors,
                           phi=0,
                           theta=-theta(rotate_to),
-                          psi=-phi(rotate_to),
-                          verbose=verbose)
+                          psi=-phi(rotate_to))
 
 
 def _sampled_direction(N, loc, scale, dist, verbose=0):
