@@ -25,8 +25,13 @@ class Surface():
     def __init__(self, n, ref=0, name="", **kwargs):
         self.n = n  # refractive index of material
         self.name = name  # name of material
+        self.reflectivity = ref
 
-        self.reflectivity = ref  # reflectivity
+        ## Enable these interactions during face_escape_status?
+        self.critical = kwargs.get('critical', True)
+        self.fresnel = kwargs.get('fresnel', True)
+        self.ref = self.reflectivity > 0
+
         self.lobeangle = kwargs.get('lobeangle', 1.3 * Degrees)  # doi: 10.1109/TNS.2010.2042731
 
         surface_parameters = kwargs.get('surface', (1, 0, 0, 0, 0))
