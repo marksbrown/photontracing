@@ -749,7 +749,8 @@ class PhotonTrace():
                 nothing_escaped_counter += 1
 
                 if nothing_escaped_counter > max_repeat:
-                    print("Giving up on run {} after {} runs with no escape".format(run_num, max_repeat))
+                    if verbose > 0:
+                        print("Giving up on run {} after {} runs with no escape".format(run_num, max_repeat))
                     break
 
 
