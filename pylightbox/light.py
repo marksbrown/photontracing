@@ -398,7 +398,7 @@ def nearest_face(Directions, Positions, aBox, verbose=0, threshold=1e-15):
     return Faces, DistanceTo, nds
 
 
-def face_escape_status(faces, ndots, aBox, reflectivity=True, fresnel=True, surface_layer='inner', verbose=0):
+def face_escape_status(faces, ndots, aBox, critical=True, reflectivity=True, fresnel=True, surface_layer='inner', verbose=0):
     """
     Photons arriving at a surface will change status to 'trapped','escaped'
     or 'absorbed' based on order of events
@@ -407,16 +407,19 @@ def face_escape_status(faces, ndots, aBox, reflectivity=True, fresnel=True, surf
     3rd test : reflectivity parameter - this WILL override everything else
     """
 
-    CritAngles = zeros(shape(faces))
-    for unique_face in set(faces):
-        CritAngles[faces == unique_face] = aBox.get_critical_angle(unique_face)
+    if critical:
+        CritAngles = zeros(shape(faces))
+        for unique_face in set(faces):
+            CritAngles[faces == unique_face] = aBox.get_critical_angle(unique_face)
 
-    angles = array([arccos(aval) for aval in ndots])
-    escape_status = angles < CritAngles  # Incident angle less than critical angle?
+        angles = array([arccos(aval) for aval in ndots])
+        escape_status = angles < CritAngles  # Incident angle less than critical angle?
 
-    if verbose > 1:
-        print("--Critical--")
-        print("Escaping", sum(escape_status))
+        if verbose > 1:
+            print("--Critical--")
+            print("Escaping", sum(escape_status))
+    else:
+        escape_status = ones(shape(faces), dtype=bool)
 
     if fresnel:
         Fresnel = aBox.fresnel_reflectance(faces, angles)
@@ -426,6 +429,8 @@ def face_escape_status(faces, ndots, aBox, reflectivity=True, fresnel=True, surf
         if verbose > 1:
             print("--Fresnel--")
             print("Escaping", sum(escape_status))
+    elif not critical:
+        escape_status = ones(shape(faces), dtype=bool)
 
     if reflectivity:
         Reflectivities = zeros(shape(faces))
@@ -440,7 +445,8 @@ def face_escape_status(faces, ndots, aBox, reflectivity=True, fresnel=True, surf
             print("Reflectivity : Escaped?")
             print("Escaping", sum(escape_status))
 
-
+    elif not critical and not fresnel:
+        escape_status = ones(shape(faces), dtype=bool)  # All Photons escape
 
     for unique_face in set(faces):
         if verbose > 0:
@@ -576,6 +582,9 @@ def step(directions, positions, times, aBox, **kwargs):
     Move photons to next position
     """
     enable_snell = kwargs.get('enable_snell', True)
+
+    critical_inner = kwargs.get('critical_inner', True)
+    critical_outer = kwargs.get('critical_outer', True)
     reflectivity_outer = kwargs.get('reflectivity_outer', True)
     reflectivity_inner = kwargs.get('reflectivity_inner', True)
     fresnel = kwargs.get('fresnel', True)
@@ -591,7 +600,7 @@ def step(directions, positions, times, aBox, **kwargs):
 
     #escape status for a polished uncoated surface -->
     #aBox.reflectivity is dealt with in the secondary escape status
-    escaped_inner = face_escape_status(faces, ndots, aBox, fresnel=fresnel,
+    escaped_inner = face_escape_status(faces, ndots, aBox, critical=critical_inner, fresnel=fresnel,
                                  reflectivity=reflectivity_inner, verbose=verbose)
 
     #only update directions of not escaping photons
@@ -607,8 +616,7 @@ def step(directions, positions, times, aBox, **kwargs):
 
     if hasattr(aBox, 'outer_materials'):
         escaped_outer = face_escape_status(faces,
-                                     ndots,
-                                     aBox, fresnel=False,
+                                     ndots, aBox, critical=critical_outer, fresnel=False,
                                      reflectivity=reflectivity_outer,
                                      surface_layer='outer',
                                      verbose=verbose)
