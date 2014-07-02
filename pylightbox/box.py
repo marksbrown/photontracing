@@ -13,7 +13,7 @@ from __future__ import print_function, division
 from itertools import combinations
 
 from numpy import arcsin, sin, dot, subtract, linalg, cos, isnan
-from numpy import tan, zeros, shape
+from numpy import tan, zeros, shape, arctan
 
 from .generic import *
 
@@ -193,19 +193,22 @@ def regular_cuboid(LX, LY, LZ, rindex, materials, **kwargs):
     )
 
 
-def raised_top_cuboid(LX, LY, LZ, ThetaX, rindex, materials, **kwargs):
+def raised_top_cuboid(LX, LY, LZ, raised, rindex, materials, **kwargs):
     """
     Creates box with raised top edge
     LX,LY,LZ : lengths of x,y,z
     ThetaX : Angle box deviates from normal
     """
-    LZPrime = LZ + LX * tan(ThetaX)
+
+    raised_top_theta = arctan(raised/LY)
+
     Normals = [[1, 0, 0], [-1, 0, 0], [0, 1, 0],
-               [0, -1, 0], [-sin(ThetaX), 0, cos(ThetaX)], [0, 0, -1]]
+               [0, -1, 0], [0, -sin(raised_top_theta), cos(raised_top_theta)], [0, 0, -1]]
     Points = [[LX, LY, LZ], [0, 0, 0], [LX, LY, LZ],
               [0, 0, 0], [LX, LY, LZ], [0, 0, 0]]
     Corners = [[0, 0, 0], [LX, 0, 0], [0, LY, 0], [0, 0, LZ],
-               [LX, LY, 0], [LX, 0, LZPrime], [0, LY, LZ], [LX, LY, LZPrime]]
+               [LX, LY, 0], [LX, 0, LZ], [0, LY, LZ + raised], [LX, LY, LZ + raised]]
+
     Facenames = {
         0: "positive x",
         1: "negative x",
