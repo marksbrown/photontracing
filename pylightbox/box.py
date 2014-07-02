@@ -45,11 +45,23 @@ class Box():  # Box Properties
         self.face = faces  # names of each face
         self.mat = materials
 
-        if 'outer_materials' in kwargs:
-            self.outer_materials = kwargs['outer_materials']
+        if 'outer_mat' in kwargs:
+            self.outer_mat = kwargs['outer_mat']
 
     def __repr__(self):
         return self.name
+
+    def face_interactions_enabled(self, face, surface_layer='inner'):
+        """
+
+        """
+
+        if surface_layer == 'inner':
+            return self.mat[face].critical, self.mat[face].fresnel, self.mat[face].ref
+        elif surface_layer == 'outer':
+            return self.outer_mat[face].critical, self.outer_mat[face].fresnel, self.outer_mat[face].ref
+
+
 
     def get_surface_parameters(self, face, surface_layer='inner'):
         """
@@ -60,7 +72,7 @@ class Box():  # Box Properties
         if surface_layer == 'inner':
             return self.mat[face].surface
         elif surface_layer == 'outer':
-            return self.outer_materials[face].surface
+            return self.outer_mat[face].surface
 
     def get_critical_angle(self, face, surface_layer='inner'):
         """
@@ -69,14 +81,14 @@ class Box():  # Box Properties
         if surface_layer == 'inner':
             return arcsin(self.mat[face].n / self.n)
         elif surface_layer == 'outer':
-            return arcsin(self.outer_materials[face].n / self.mat[face].n)
+            return arcsin(self.outer_mat[face].n / self.mat[face].n)
 
     def get_reflectivity(self, face, surface_layer='inner'):
 
         if surface_layer == 'inner':
             return self.mat[face].reflectivity
         elif surface_layer == 'outer':
-            return self.outer_materials[face].reflectivity
+            return self.outer_mat[face].reflectivity
 
     def get_surface_normal(self, face):
         return self.normals[face]

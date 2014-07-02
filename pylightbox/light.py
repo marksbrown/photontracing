@@ -398,7 +398,7 @@ def nearest_face(Directions, Positions, aBox, verbose=0, threshold=1e-15):
     return Faces, DistanceTo, nds
 
 
-def face_escape_status(faces, ndots, aBox, critical=True, reflectivity=True, fresnel=True, surface_layer='inner', verbose=0):
+def face_escape_status(faces, ndots, aBox, surface_layer='inner', verbose=0):
     """
     Photons arriving at a surface will change status to 'trapped','escaped'
     or 'absorbed' based on order of events
@@ -407,47 +407,30 @@ def face_escape_status(faces, ndots, aBox, critical=True, reflectivity=True, fre
     3rd test : reflectivity parameter - this WILL override everything else
     """
 
-    if critical:
-        CritAngles = zeros(shape(faces))
-        for unique_face in set(faces):
-            CritAngles[faces == unique_face] = aBox.get_critical_angle(unique_face)
+    escape_status = ones(shape(faces), dtype=bool)
 
-        angles = array([arccos(aval) for aval in ndots])
-        escape_status = angles < CritAngles  # Incident angle less than critical angle?
 
-        if verbose > 1:
-            print("--Critical--")
-            print("Escaping", sum(escape_status))
-    else:
-        escape_status = ones(shape(faces), dtype=bool)
+    for unique_face in set(faces):
+        condition = faces == unique_face
+        interactions = aBox.face_interactions_enabled(unique_face, surface_layer)
+        if not any(interactions):
+            continue
+        critical, fresnel, reflectivity = interactions
 
-    if fresnel:
-        Fresnel = aBox.fresnel_reflectance(faces, angles)
-        ru = random.uniform(size=len(faces))
-        escape_status &= (Fresnel < ru)  # Reflection coefficient less than
+        angles = arccos(ndots[condition])
 
-        if verbose > 1:
-            print("--Fresnel--")
-            print("Escaping", sum(escape_status))
-    elif not critical:
-        escape_status = ones(shape(faces), dtype=bool)
+        if critical:
+            critical_angle_of_face = aBox.get_critical_angle(unique_face)
+            escape_status[condition] = angles < critical_angle_of_face  # Incident angle less than critical angle?
 
-    if reflectivity:
-        Reflectivities = zeros(shape(faces))
-        for unique_face in set(faces):
-            Reflectivities[faces == unique_face] = aBox.get_reflectivity(unique_face, surface_layer)
+        if fresnel:
+            fresnel_of_face = aBox.fresnel_reflectance(faces[condition], angles)
+            escape_status[condition] &= (fresnel_of_face < random.uniform(size=sum(condition)))  # fresnel < random?
 
-        ru = random.uniform(size=len(faces))
-        escape_status &= (Reflectivities < ru)
-
-        if verbose > 1:
-            print("--Reflectivity--")
-            print("Reflectivity : Escaped?")
-            print("Escaping", sum(escape_status))
-
-    elif not critical and not fresnel:
-        escape_status = ones(shape(faces), dtype=bool)  # All Photons escape
-
+        if reflectivity:
+            reflectivity_of_face = aBox.get_reflectivity(unique_face, surface_layer)
+            escape_status[condition] &= (reflectivity_of_face < random.uniform(size=sum(condition)))
+    
     for unique_face in set(faces):
         if verbose > 0:
             print("{} photons incident with {} escaping from face {}".format(
@@ -582,12 +565,6 @@ def step(directions, positions, times, aBox, **kwargs):
     Move photons to next position
     """
     enable_snell = kwargs.get('enable_snell', True)
-
-    critical_inner = kwargs.get('critical_inner', True)
-    critical_outer = kwargs.get('critical_outer', True)
-    reflectivity_outer = kwargs.get('reflectivity_outer', True)
-    reflectivity_inner = kwargs.get('reflectivity_inner', True)
-    fresnel = kwargs.get('fresnel', True)
     specular_only = kwargs.get('specularonly', False)
     verbose = kwargs.get('verbose', 0)
 
@@ -600,8 +577,7 @@ def step(directions, positions, times, aBox, **kwargs):
 
     #escape status for a polished uncoated surface -->
     #aBox.reflectivity is dealt with in the secondary escape status
-    escaped_inner = face_escape_status(faces, ndots, aBox, critical=critical_inner, fresnel=fresnel,
-                                 reflectivity=reflectivity_inner, verbose=verbose)
+    escaped_inner = face_escape_status(faces, ndots, aBox, verbose=verbose)
 
     #only update directions of not escaping photons
 
@@ -614,12 +590,9 @@ def step(directions, positions, times, aBox, **kwargs):
                                                            specular_only=specular_only,
                                                            verbose=verbose)
 
-    if hasattr(aBox, 'outer_materials'):
+    if hasattr(aBox, 'outer_mat'):
         escaped_outer = face_escape_status(faces,
-                                     ndots, aBox, critical=critical_outer, fresnel=False,
-                                     reflectivity=reflectivity_outer,
-                                     surface_layer='outer',
-                                     verbose=verbose)
+                                     ndots, aBox, verbose=verbose)
 
         escaped = escaped_outer & escaped_inner
         reflected_from_outer = invert(escaped_outer) & escaped_inner
