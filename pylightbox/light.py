@@ -240,7 +240,7 @@ def theta_phi_segment_reflection(N, surface_normal=array([0, 0, 1]), mat=None, f
 
     while True:
 
-        potential_directions = generate_isotropic_source(N, 'all')
+        potential_directions = generate_isotropic_source(N)
 
         phi = arctan2(potential_directions[..., 1], potential_directions[..., 0])
         phi[phi < 0] += 2*pi
