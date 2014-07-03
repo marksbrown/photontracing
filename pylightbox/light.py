@@ -517,75 +517,49 @@ def _get_new_direction(key, old_direction, ndots, surface_normal, mat, verbose=0
         raise NotImplementedError("Unknown Reflection type!")
 
 
-def update_specular_direction(old_direction, faces, ndots, aBox, specular_only=True, verbose=0):
-    """
-    Updates directions using the specular model only
-    """
-
-    new_direction = zeros(shape(old_direction))  # newdirection
-
-    for uniqueface in set(faces):
-        surfacenormal = aBox.normals[uniqueface]
-        Condition = (faces == uniqueface)
-        if not any(Condition):
-            continue
-
-        new_direction[Condition, ...] = _get_new_direction(
-            0, old_direction[Condition, ...],
-            ndots[Condition, ...],
-            surfacenormal, aBox.mat[uniqueface], verbose=verbose)
-
-    return new_direction
-
-
 def update_direction(old_direction, faces, ndots, aBox, surface_layer='inner', specular_only=False, verbose=0):
     """
     Calculates new direction for a given photon at a given face for a set
     of UNIFIED parameters
     """
-    newdirection = zeros(shape(old_direction))  # newdirection
+    new_direction = zeros(shape(old_direction))  # new direction
 
-    unifiedparameters = zeros((len(faces), 5))  #  TODO replace 5 with number fetched from aBox.mat class
+    for unique_face in set(faces):
+        condition = (faces == unique_face)
 
-    if verbose > 1:
-        print("The unified parameters for the {} surface are {}".format(surface_layer, aBox.get_surface_parameters(0, surface_layer)))
+        surface_parameters = aBox.get_surface_parameters(unique_face, surface_layer)
 
-    for uniqueface in set(faces):
-        Condition = (faces == uniqueface)
-        unifiedparameters[Condition] = aBox.get_surface_parameters(uniqueface, surface_layer)
+        if specular_only:
+            new_direction[condition, ...] = _get_new_direction(0, old_direction[condition, ...],
+                                                               ndots[condition, ...], aBox.normals[unique_face],
+                                                               aBox.mat[unique_face], verbose=verbose)
+            continue
 
-    if specular_only:
-        which_reflection = (0,)  # specular reflection only
-
-    else:
-        which_reflection = array([_first_true(ru < up) for (ru, up)
-                                 in zip(random.uniform(size=len(faces)), unifiedparameters)])
+        else:
+            which_reflection = array([_first_true(rand_num < surface_parameters)
+                                      for rand_num in random.uniform(size=sum(condition))])
 
 
-    for uniqueface in set(faces):
-        surfacenormal = aBox.normals[uniqueface]
-        # faces x numunified (6 x 4 groups for a cube!)
         for aref in set(which_reflection):
-            if specular_only:
-                Condition = faces == uniqueface
-            else:
-                Condition = (faces == uniqueface) & (which_reflection == aref)
 
-            if not any(Condition):
+            ref_condition = (which_reflection == aref)
+
+            if not any(ref_condition):
                 continue
 
-            newdirection[Condition, ...] = _get_new_direction(
-                aref, old_direction[Condition, ...],
-                ndots[Condition, ...],
-                surfacenormal, aBox.mat[uniqueface], verbose=verbose)
+            new_direction[condition] = _get_new_direction(aref, old_direction[condition][ref_condition, ...],
+                                                               ndots[condition][ref_condition, ...], aBox.normals[unique_face],
+                                                               aBox.mat[unique_face], verbose=verbose)
+
+
 
     if verbose > 1:
         print("--Update Direction--")
-        for od, nd in zip(old_direction, newdirection):
+        for od, nd in zip(old_direction, new_direction):
             print("Old direction :", od)
             print("New direction : ", nd)
 
-    return newdirection
+    return new_direction
 
 
 def update_position(old_position, distanceto, old_time, directions, aBox, verbose=0):
