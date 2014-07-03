@@ -21,7 +21,7 @@ def save_figure(name, loc, fig, file_extensions=('pdf', 'eps', 'png')):
         fig.savefig(saveloc)
 
 
-def _to_cube(axis, anum=1):
+def to_cube(axis, anum=1):
     axis.set_xlim(-anum, anum)
     axis.set_ylim(-anum, anum)
     axis.set_zlim(-anum, anum)

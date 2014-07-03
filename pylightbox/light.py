@@ -221,6 +221,58 @@ def theta_segment_reflection(N=1, surface_normal=array([0, 0, 1]), mat=None,
             return rotate_vectors(new_directions[indices], -surface_normal, verbose)
 
 
+def phi_cone_segment_reflection(N, surface_normal=array([0, 0, 1]), mat=None, fetchall=False, verbose=0):
+    """
+    Photons within (min_phi -> max_phi) AND (min_phi + 180*Degrees -> max_phi
+    """
+    if mat.minphi is None or mat.maxphi is None:
+        raise NameError('both phi conditions not defined in material')
+
+
+    while True:
+        potential_directions = _random_points_on_a_sphere(N, hemisphere=True)
+
+        phi = arctan2(potential_directions[..., 1], potential_directions[..., 0])
+        phi[phi < 0] += 2*pi
+
+        condition = ((phi > mat.minphi) & (phi < mat.maxphi)) | ((phi > pi+mat.minphi) & (phi < pi+mat.maxphi))
+
+
+        if not any(condition):
+            if verbose > 0:
+                print("None Found")
+
+            continue
+
+
+        try:  # matching directions aren't wasted when we generate more
+            new_directions = vstack((new_directions, potential_directions[condition]))
+        except UnboundLocalError:
+            new_directions = potential_directions[condition]
+
+        if verbose > 0:
+            print("Additional matching is", sum(condition))
+            print("Total is now", len(new_directions))
+            print("Shape of AllowDirections is", shape(new_directions))
+
+        if len(new_directions) < N:
+            continue
+
+        if fetchall:
+            return rotate_vectors(new_directions, -surface_normal, verbose)
+        else:   # returns 'N' valid new directions only
+            try:
+                indices = random.choice(range(len(new_directions)), N)
+            except AttributeError:
+                indices = random_integers(len(new_directions), N)
+            return rotate_vectors(new_directions[indices], -surface_normal, verbose)
+
+    return None
+
+
+
+
+
 def theta_phi_segment_reflection(N, surface_normal=array([0, 0, 1]), mat=None, fetchall=False, verbose=0):
     """
     Returns N directions from sphere point picking within theta and phi ranges only
@@ -232,24 +284,17 @@ def theta_phi_segment_reflection(N, surface_normal=array([0, 0, 1]), mat=None, f
             print("No phi range defined, skipping to default theta_segment_reflection")
         return theta_segment_reflection(N, surface_normal, mat, fetchall, verbose)
 
-    min_theta = mat.mintheta
-    max_theta = mat.maxtheta
-
-    min_phi = mat.minphi
-    max_phi = mat.maxphi
-
     while True:
-
         potential_directions = generate_isotropic_source(N)
 
         phi = arctan2(potential_directions[..., 1], potential_directions[..., 0])
         phi[phi < 0] += 2*pi
 
-        min_phi_condition = phi > min_phi
-        max_phi_condition = phi < max_phi
+        min_phi_condition = phi > mat.minphi
+        max_phi_condition = phi < mat.maxphi
 
-        min_theta_condition = potential_directions[..., 2] < cos(min_theta)
-        max_theta_condition = potential_directions[..., 2] > cos(max_theta)
+        min_theta_condition = potential_directions[..., 2] < cos(mat.mintheta)
+        max_theta_condition = potential_directions[..., 2] > cos(mat.maxtheta)
 
         min_condition = min_phi_condition & min_theta_condition
         max_condition = max_phi_condition & max_theta_condition
